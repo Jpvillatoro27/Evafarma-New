@@ -743,7 +743,7 @@ export const usuariosService = {
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nombre, email')
+        .select('id, nombre, email, rol')
         .eq('rol', 'visitador')
         .order('nombre')
 
