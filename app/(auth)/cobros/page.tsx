@@ -434,7 +434,7 @@ export default function CobrosPage() {
                   </td>
                   <td className="px-4 py-2">
                     <span className={`px-2 py-1 rounded-full text-xs ${
-                      cobro.Estado === 'confirmado' 
+                      cobro.Estado === 'Confirmado' 
                         ? 'bg-green-100 text-green-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
@@ -442,7 +442,7 @@ export default function CobrosPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    {cobro.Estado === 'pendiente' && (
+                    {cobro.Estado === 'Pendiente' && (
                       <Button
                         variant="ghost"
                         size="sm"
