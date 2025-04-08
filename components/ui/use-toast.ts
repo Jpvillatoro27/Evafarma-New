@@ -140,14 +140,6 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = {
-  id: string
-  title?: string
-  description?: string
-  action?: ToastActionElement
-  variant?: "default" | "destructive"
-}
-
 export function toast({ ...props }: Omit<Toast, "id">) {
   const id = genId()
 
