@@ -67,7 +67,6 @@ export default function CobrosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [clientes, setClientes] = useState<any[]>([])
   const [visitadores, setVisitadores] = useState<Visitador[]>([])
-  const [filtroFecha, setFiltroFecha] = useState<string>('')
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
@@ -119,13 +118,6 @@ export default function CobrosPage() {
     if (cobros.length > 0) {
       let filtrados = [...cobros]
 
-      // Aplicar filtro por fecha
-      if (filtroFecha) {
-        filtrados = filtrados.filter(cobro => 
-          format(new Date(cobro.fecha), 'yyyy-MM-dd') === filtroFecha
-        )
-      }
-
       // Aplicar filtro por visitador
       if (filtroVisitador !== 'todos') {
         filtrados = filtrados.filter(cobro => cobro.visitador === filtroVisitador)
@@ -133,7 +125,7 @@ export default function CobrosPage() {
 
       setCobrosFiltrados(filtrados)
     }
-  }, [cobros, filtroFecha, filtroVisitador])
+  }, [cobros, filtroVisitador])
 
   const loadCobros = async () => {
     try {
@@ -323,7 +315,7 @@ export default function CobrosPage() {
     }
   }
 
-  const handleConfirmarCobro = async (cobroId: string, clienteId: string, total: number) => {
+  const handleConfirmarCobro = async (cobroId: string) => {
     if (!window.confirm('¿Está seguro de confirmar este cobro?')) {
       return;
     }
@@ -331,14 +323,6 @@ export default function CobrosPage() {
     try {
       // Confirmar el cobro
       await cobrosService.confirmarCobro(cobroId)
-      
-      // Actualizar el saldo pendiente del cliente
-      await clientesService.actualizarSaldo(clienteId, -total)
-      
-      toast({
-        title: 'Cobro confirmado',
-        description: 'El cobro ha sido confirmado y el saldo actualizado',
-      })
       
       // Recargar los cobros para actualizar la vista
       loadCobros()
@@ -385,133 +369,14 @@ export default function CobrosPage() {
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Cobros</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>Nuevo Cobro</Button>
-      </div>
-
-      {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <Label>Filtrar por fecha</Label>
-          <Input
-            type="date"
-            value={filtroFecha}
-            onChange={(e) => setFiltroFecha(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label>Filtrar por visitador</Label>
-          <Select value={filtroVisitador} onValueChange={setFiltroVisitador}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar visitador" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los visitadores</SelectItem>
-              {visitadores.map(visitador => (
-                <SelectItem key={visitador.id} value={visitador.id}>
-                  {visitador.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-end">
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setFiltroFecha('')
-              setFiltroVisitador('todos')
-            }}
-          >
-            Limpiar filtros
-          </Button>
-        </div>
-      </div>
-
-      {/* Resumen de cobros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Total Cobros</h3>
-          <p className="text-2xl font-bold">
-            {formatCurrency(cobrosFiltrados.reduce((sum, cobro) => sum + cobro.total, 0))}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Cobros Pendientes</h3>
-          <p className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(cobrosFiltrados
-              .filter(cobro => cobro.Estado === 'Pendiente')
-              .reduce((sum, cobro) => sum + cobro.total, 0)
-            )}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Cobros Confirmados</h3>
-          <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(cobrosFiltrados
-              .filter(cobro => cobro.Estado === 'Confirmado')
-              .reduce((sum, cobro) => sum + cobro.total, 0)
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* Tabla de cobros */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {cobrosFiltrados.map((cobro) => (
-              <tr key={cobro.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{cobro.numero}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">{cobro.clientes.nombre}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(cobro.total)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    cobro.Estado === 'Confirmado' 
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {cobro.Estado}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {cobro.Estado === 'Pendiente' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                    >
-                      Confirmar
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button>Nuevo Cobro</Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Cobro</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>Nuevo Cobro</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Nuevo Cobro</DialogTitle>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -679,9 +544,103 @@ export default function CobrosPage() {
                 </div>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="mb-6 flex gap-4">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder="Buscar por número, cliente, descripción o monto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="w-64">
+          <Select value={filtroVisitador} onValueChange={setFiltroVisitador}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por visitador" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los visitadores</SelectItem>
+              {visitadores.map((visitador) => (
+                <SelectItem key={visitador.id} value={visitador.id}>
+                  {visitador.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{error}</span>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitador</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cobrosFiltrados.map((cobro) => (
+                  <tr key={cobro.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">{cobro.numero}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {cobro.clientes?.nombre}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{cobro.descripcion}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(cobro.total)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {visitadores.find(v => v.id === cobro.visitador)?.nombre}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        cobro.Estado === 'confirmado' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Pendiente'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleConfirmarCobro(cobro.id)}
+                        disabled={cobro.Estado === 'confirmado'}
+                      >
+                        {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Confirmar'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   )
 } 
