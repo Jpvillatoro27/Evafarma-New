@@ -236,28 +236,9 @@ export const productosService = {
   async registrarHistorialStock(historial: Omit<HistorialStock, 'id'>) {
     const { data, error } = await supabase
       .from('historial_stock')
-      .insert([historial])
+      .insert(historial)
       .select()
-      .single()
-
     if (error) throw error
-    return data as HistorialStock
-  },
-
-  async getHistorialStock(producto_id: string) {
-    const { data, error } = await supabase
-      .from('historial_stock')
-      .select(`
-        *,
-        usuarios:usuario_id (
-          id,
-          nombre
-        )
-      `)
-      .eq('producto_id', producto_id)
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-    return data as HistorialStock[]
+    return data
   }
 } 

@@ -3,15 +3,16 @@ import { cookies } from 'next/headers'
 import { Usuario } from '@/types'
 
 // Función para obtener el cliente de Supabase
-function getSupabaseClient() {
-  const cookieStore = cookies()
+async function getSupabaseClient() {
+  const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value
+          const cookie = cookieStore.get(name)
+          return cookie?.value
         },
         set(name: string, value: string, options: any) {
           cookieStore.set({ name, value, ...options })
@@ -28,7 +29,7 @@ function getSupabaseClient() {
 export const usuariosService = {
   async getUsuarioActual() {
     try {
-      const supabase = getSupabaseClient()
+      const supabase = await getSupabaseClient()
       
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
@@ -50,27 +51,38 @@ export const usuariosService = {
               {
                 id: user.id,
                 email: user.email,
-                rol: 'visitador',
-                nombre: user.email?.split('@')[0] || 'Usuario'
+                nombre: user.user_metadata?.full_name || user.email?.split('@')[0],
+                rol: 'visitador'
               }
             ])
             .select()
             .single()
 
-          if (insertError) return null
-          return newUser as Usuario
+          if (insertError) {
+            console.error('Error al crear usuario:', insertError)
+            return null
+          }
+
+          return newUser
         }
+        console.error('Error al obtener usuario:', error)
         return null
       }
 
-      return data as Usuario
-    } catch (err) {
+      return data
+    } catch (error) {
+      console.error('Error en getUsuarioActual:', error)
       return null
     }
   },
 
   async esAdmin() {
-    const usuario = await this.getUsuarioActual()
-    return usuario?.rol === 'admin'
+    try {
+      const usuario = await this.getUsuarioActual()
+      return usuario?.rol === 'admin'
+    } catch (error) {
+      console.error('Error en esAdmin:', error)
+      return false
+    }
   }
 } 

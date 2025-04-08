@@ -33,4 +33,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
