@@ -38,7 +38,9 @@ export default function Navbar() {
     { name: 'Clientes', href: '/clientes' },
     { name: 'Cobros', href: '/cobros' },
     { name: 'Ventas', href: '/ventas' },
-    ...(isAdmin ? [{ name: 'Usuarios', href: '/usuarios' }] : []),
+    { name: 'Ventas Mensuales', href: '/ventas-mensuales' },
+    { name: 'Productos', href: '/productos' },
+    ...(isAdmin ? [{ name: 'Visitadores', href: '/usuarios' }] : []),
   ]
 
   return (

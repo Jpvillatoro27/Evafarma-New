@@ -10,12 +10,39 @@ export const clientesService = {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .order('nombre')
+        .order('created_at', { ascending: false })
 
       if (error) throw error
       return data || []
     } catch (error) {
       console.error('Error al obtener clientes:', error)
+      throw error
+    }
+  },
+
+  async getUltimoCodigoPorDepartamento(departamento: string, codigoISO: string) {
+    try {
+      // Consulta específica que solo selecciona el código
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('codigo')
+        .like('codigo', `${codigoISO}%`)
+        .order('codigo', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw error
+      
+      if (!data) {
+        return `${codigoISO}0001` // Primer cliente para este departamento
+      }
+
+      const ultimoCodigo = data.codigo
+      const numeroActual = parseInt(ultimoCodigo.slice(2))
+      const siguienteNumero = (numeroActual + 1).toString().padStart(4, '0')
+      return `${codigoISO}${siguienteNumero}`
+    } catch (error) {
+      console.error('Error al obtener último código:', error)
       throw error
     }
   },
@@ -29,6 +56,7 @@ export const clientesService = {
     visitador: string
     propietario?: string
     saldo_pendiente?: number
+    Departamento: string
   }) {
     try {
       const { data, error } = await supabase
@@ -91,6 +119,33 @@ export const clientesService = {
       console.error('Error al eliminar cliente:', error)
       throw error
     }
+  },
+
+  async actualizarSaldo(id: string, monto: number) {
+    try {
+      const { data: cliente, error: selectError } = await supabase
+        .from('clientes')
+        .select('saldo_pendiente')
+        .eq('id', id)
+        .single()
+
+      if (selectError) throw selectError
+
+      const nuevoSaldo = (cliente.saldo_pendiente || 0) + monto
+
+      const { data, error: updateError } = await supabase
+        .from('clientes')
+        .update({ saldo_pendiente: nuevoSaldo })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+      return data
+    } catch (error) {
+      console.error('Error al actualizar saldo:', error)
+      throw error
+    }
   }
 }
 
@@ -101,7 +156,23 @@ export const cobrosService = {
       const { data, error } = await supabase
         .from('cobros')
         .select(`
-          *,
+          id,
+          numero,
+          fecha,
+          cod_farmacia,
+          cliente_id,
+          descripcion,
+          total,
+          visitador,
+          fecha_cheque,
+          banco,
+          numero_cheque,
+          valor_cheque,
+          otros,
+          otros2,
+          otros3,
+          Estado,
+          created_at,
           clientes:cliente_id (
             id,
             codigo,
@@ -142,7 +213,7 @@ export const cobrosService = {
     try {
       const { data, error } = await supabase
         .from('cobros')
-        .insert([cobroData])
+        .insert([{ ...cobroData, Estado: 'Pendiente' }])
         .select()
         .single()
 
@@ -239,6 +310,23 @@ export const cobrosService = {
       console.error('Error al eliminar cobro:', error)
       throw error
     }
+  },
+
+  async confirmarCobro(id: string) {
+    try {
+      const { data, error } = await supabase
+        .from('cobros')
+        .update({ Estado: 'Confirmado' })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Error al confirmar cobro:', error)
+      throw error
+    }
   }
 }
 
@@ -300,12 +388,64 @@ export const recibosService = {
 
 // Servicios de Ventas
 export const ventasService = {
-  async getVentas() {
+  async getUltimoCodigoVenta() {
     try {
       const { data, error } = await supabase
         .from('ventas_mensuales')
+        .select('codigo')
+        .order('codigo', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error al obtener último código:', error)
+        throw error
+      }
+
+      if (!data) {
+        return 'V00000001'
+      }
+
+      // Extraer el número del código (V00000001 -> 1)
+      const numeroActual = parseInt(data.codigo.replace('V', ''))
+      const siguienteNumero = numeroActual + 1
+      
+      // Formatear el nuevo código con 8 dígitos
+      return `V${siguienteNumero.toString().padStart(8, '0')}`
+    } catch (error) {
+      console.error('Error al generar código de venta:', error)
+      throw error
+    }
+  },
+
+  async getVentas() {
+    try {
+      // Obtener el usuario actual
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
+
+      // Obtener el rol del usuario
+      const { data: usuarioData, error: usuarioError } = await supabase
+        .from('usuarios')
+        .select('rol')
+        .eq('id', user?.id)
+        .single()
+
+      if (usuarioError) throw usuarioError
+
+      // Construir la consulta base
+      let query = supabase
+        .from('ventas_mensuales')
         .select(`
-          *,
+          id,
+          codigo,
+          fecha,
+          cliente_id,
+          visitador,
+          total,
+          created_at,
+          estado,
+          rastreo,
           clientes:cliente_id (
             id,
             codigo,
@@ -316,7 +456,7 @@ export const ventasService = {
             propietario,
             saldo_pendiente
           ),
-          productos:id (
+          productos:productos_venta!productos_venta_venta_id_fkey (
             id,
             nombre,
             cantidad,
@@ -324,7 +464,14 @@ export const ventasService = {
             total
           )
         `)
-        .order('fecha', { ascending: false })
+
+      // Si es visitador, filtrar solo sus ventas
+      if (usuarioData.rol === 'visitador') {
+        query = query.eq('visitador', user?.id)
+      }
+
+      // Ordenar por fecha de creación
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
       return data || []
@@ -347,14 +494,19 @@ export const ventasService = {
     }>
   }) {
     try {
+      // Obtener el código
+      const codigo = await this.getUltimoCodigoVenta()
+
       // 1. Crear la venta
       const { data: venta, error: ventaError } = await supabase
         .from('ventas_mensuales')
         .insert([{
+          codigo,
           fecha: ventaData.fecha,
           cliente_id: ventaData.cliente_id,
           visitador: ventaData.visitador,
-          total: ventaData.total
+          total: ventaData.total,
+          estado: 'pendiente' // Estado por defecto
         }])
         .select()
         .single()
@@ -583,6 +735,22 @@ export const usuariosService = {
       if (error) throw error
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
+      throw error
+    }
+  },
+
+  async getVisitadores() {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nombre, email')
+        .eq('rol', 'visitador')
+        .order('nombre')
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al obtener visitadores:', error)
       throw error
     }
   }

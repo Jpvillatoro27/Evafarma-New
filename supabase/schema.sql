@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.cobros (
     otros TEXT,
     otros2 TEXT,
     otros3 TEXT,
+    estado TEXT DEFAULT 'pendiente',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS public.recibos (
 
 CREATE TABLE IF NOT EXISTS public.ventas_mensuales (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    codigo TEXT NOT NULL UNIQUE,
     fecha DATE NOT NULL,
     cliente_id UUID REFERENCES public.clientes(id),
     visitador UUID REFERENCES auth.users(id),
@@ -97,12 +99,18 @@ DROP POLICY IF EXISTS "Los visitadores solo pueden ver sus propios clientes" ON 
 DROP POLICY IF EXISTS "Los administradores pueden ver todos los clientes" ON public.clientes;
 DROP POLICY IF EXISTS "Los usuarios pueden ver su propia información" ON public.usuarios;
 DROP POLICY IF EXISTS "Los administradores pueden ver todos los usuarios" ON public.usuarios;
+DROP POLICY IF EXISTS "Permitir lectura de códigos de clientes" ON public.clientes;
 
 -- Create policies
 CREATE POLICY "Los visitadores solo pueden ver sus propios clientes"
     ON public.clientes
-    FOR SELECT
-    USING (auth.uid() = visitador);
+    FOR ALL
+    TO authenticated
+    USING (
+        (auth.uid() = visitador AND (SELECT rol FROM public.usuarios WHERE id = auth.uid()) = 'visitador')
+        OR
+        (SELECT rol FROM public.usuarios WHERE id = auth.uid()) = 'admin'
+    );
 
 CREATE POLICY "Los administradores pueden ver todos los clientes"
     ON public.clientes
@@ -124,5 +132,13 @@ CREATE POLICY "Los administradores pueden ver todos los usuarios"
         SELECT 1 FROM public.usuarios
         WHERE id = auth.uid() AND rol = 'admin'
     ));
+
+-- Política específica para permitir la lectura de códigos de clientes
+CREATE POLICY "Permitir lectura de códigos de clientes"
+    ON public.clientes
+    FOR SELECT
+    TO authenticated
+    USING (true)
+    WITH CHECK (false);
 
 -- Similar policies for other tables... 

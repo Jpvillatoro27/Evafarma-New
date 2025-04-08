@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { cobrosService, clientesService } from '@/lib/services'
+import { cobrosService, clientesService, usuariosService } from '@/lib/services'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 interface Cobro {
   id: string
@@ -28,6 +29,7 @@ interface Cobro {
   otros2?: string
   otros3?: string
   created_at: string
+  Estado: string
   clientes: {
     id: string
     codigo: string
@@ -41,13 +43,23 @@ interface Cobro {
   }
 }
 
+interface Visitador {
+  id: string
+  nombre: string
+  email: string
+}
+
 export default function CobrosPage() {
   const [cobros, setCobros] = useState<Cobro[]>([])
+  const [cobrosFiltrados, setCobrosFiltrados] = useState<Cobro[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [clientes, setClientes] = useState<any[]>([])
+  const [visitadores, setVisitadores] = useState<Visitador[]>([])
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const [formData, setFormData] = useState({
     numero: '',
@@ -60,15 +72,52 @@ export default function CobrosPage() {
     fecha_cheque: '',
     banco: '',
     numero_cheque: '',
-    valor_cheque: 0
+    valor_cheque: 0,
+    otros: '',
+    otros2: '',
+    otros3: ''
   })
+
+  const [selectedCliente, setSelectedCliente] = useState<any>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      setFormData(prev => ({ ...prev, visitador: user.id }))
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setCobrosFiltrados(cobros)
+      return
+    }
+
+    const termino = searchTerm.toLowerCase()
+    const filtered = cobros.filter(cobro => 
+      cobro.numero.toLowerCase().includes(termino) ||
+      cobro.clientes.nombre.toLowerCase().includes(termino) ||
+      cobro.clientes.codigo.toLowerCase().includes(termino) ||
+      cobro.descripcion?.toLowerCase().includes(termino) ||
+      cobro.total.toString().includes(termino) ||
+      new Date(cobro.fecha).toLocaleDateString().includes(termino)
+    )
+    setCobrosFiltrados(filtered)
+  }, [searchTerm, cobros])
 
   const loadCobros = async () => {
     try {
       setLoading(true)
       setError(null)
       const data = await cobrosService.getCobros()
-      setCobros(data)
+      const usuario = await usuariosService.getUsuarioActual()
+      
+      // Filtrar los cobros según el rol del usuario
+      const cobrosFiltrados = usuario?.rol === 'admin'
+        ? data
+        : data.filter(cobro => cobro.visitador === usuario?.id)
+      
+      setCobros(cobrosFiltrados)
+      setCobrosFiltrados(cobrosFiltrados)
     } catch (error) {
       console.error('Error al cargar cobros:', error)
       setError(error instanceof Error ? error.message : 'Error al cargar los cobros')
@@ -85,7 +134,14 @@ export default function CobrosPage() {
     const loadClientes = async () => {
       try {
         const data = await clientesService.getClientes()
-        setClientes(data)
+        const usuario = await usuariosService.getUsuarioActual()
+        
+        // Filtrar los clientes según el rol del usuario
+        const clientesFiltrados = usuario?.rol === 'admin'
+          ? data
+          : data.filter(cliente => cliente.visitador === usuario?.id)
+        
+        setClientes(clientesFiltrados)
       } catch (error) {
         console.error('Error al cargar clientes:', error)
       }
@@ -93,11 +149,98 @@ export default function CobrosPage() {
     loadClientes()
   }, [])
 
+  useEffect(() => {
+    const loadVisitadores = async () => {
+      try {
+        const data = await usuariosService.getVisitadores()
+        setVisitadores(data)
+      } catch (error) {
+        console.error('Error al cargar visitadores:', error)
+      }
+    }
+    loadVisitadores()
+  }, [])
+
+  const handleClienteChange = (clienteId: string) => {
+    const cliente = clientes.find(c => c.id === clienteId)
+    setSelectedCliente(cliente)
+    setFormData(prev => ({
+      ...prev,
+      cliente_id: clienteId,
+      cod_farmacia: cliente?.codigo || ''
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validaciones
+    if (!formData.numero.trim()) {
+      toast({
+        title: "Error",
+        description: "El número de cobro es requerido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.fecha) {
+      toast({
+        title: "Error",
+        description: "La fecha es requerida",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.cliente_id) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.visitador) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un visitador",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.total <= 0) {
+      toast({
+        title: "Error",
+        description: "El total debe ser mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Preparar datos para envío
+    const cobroData = {
+      ...formData,
+      fecha: formData.fecha || new Date().toISOString().split('T')[0],
+      fecha_cheque: formData.fecha_cheque || undefined,
+      valor_cheque: formData.valor_cheque || undefined,
+      banco: formData.banco || undefined,
+      numero_cheque: formData.numero_cheque || undefined,
+      otros: formData.otros || undefined,
+      otros2: formData.otros2 || undefined,
+      otros3: formData.otros3 || undefined,
+      total: Number(formData.total)
+    };
+
+    if (!window.confirm('¿Está seguro de crear este cobro?')) {
+      return;
+    }
+
     try {
-      const nuevoCobro = await cobrosService.createCobro(formData)
-      setCobros([...cobros, nuevoCobro])
+      const nuevoCobro = await cobrosService.createCobro(cobroData)
+      setCobros([...cobros, nuevoCobro as Cobro])
       setFormData({
         numero: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -105,12 +248,16 @@ export default function CobrosPage() {
         cliente_id: '',
         descripcion: '',
         total: 0,
-        visitador: '',
+        visitador: user?.id || '',
         fecha_cheque: '',
         banco: '',
         numero_cheque: '',
-        valor_cheque: 0
+        valor_cheque: 0,
+        otros: '',
+        otros2: '',
+        otros3: ''
       })
+      setSelectedCliente(null)
       setIsDialogOpen(false)
       toast({
         title: 'Cobro creado',
@@ -121,7 +268,36 @@ export default function CobrosPage() {
       console.error('Error al crear cobro:', err)
       toast({
         title: 'Error',
-        description: 'No se pudo crear el cobro',
+        description: err instanceof Error ? err.message : 'No se pudo crear el cobro',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleConfirmarCobro = async (cobroId: string, clienteId: string, total: number) => {
+    if (!window.confirm('¿Está seguro de confirmar este cobro?')) {
+      return;
+    }
+
+    try {
+      // Confirmar el cobro
+      await cobrosService.confirmarCobro(cobroId)
+      
+      // Actualizar el saldo pendiente del cliente
+      await clientesService.actualizarSaldo(clienteId, -total)
+      
+      toast({
+        title: 'Cobro confirmado',
+        description: 'El cobro ha sido confirmado y el saldo actualizado',
+      })
+      
+      // Recargar los cobros para actualizar la vista
+      loadCobros()
+    } catch (error) {
+      console.error('Error al confirmar cobro:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo confirmar el cobro',
         variant: 'destructive'
       })
     }
@@ -164,198 +340,240 @@ export default function CobrosPage() {
           <DialogTrigger asChild>
             <Button>Nuevo Cobro</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Cobro</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="numero">Número</Label>
-                  <Input
-                    id="numero"
-                    value={formData.numero}
-                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fecha">Fecha</Label>
-                  <Input
-                    id="fecha"
-                    type="date"
-                    value={formData.fecha}
-                    onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="cliente">Cliente</Label>
-                <Select 
-                  value={formData.cliente_id} 
-                  onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="total">Total</Label>
-                <Input
-                  id="total"
-                  type="number"
-                  step="0.01"
-                  value={formData.total}
-                  onChange={(e) => setFormData({ ...formData, total: parseFloat(e.target.value) })}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="descripcion">Descripción</Label>
-                <Input
-                  id="descripcion"
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="visitador">Visitador</Label>
-                <Input
-                  id="visitador"
-                  value={formData.visitador}
-                  onChange={(e) => setFormData({ ...formData, visitador: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-4 border-t pt-4 mt-4">
-                <h3 className="font-medium">Información de Cheque (Opcional)</h3>
+            <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="fecha_cheque">Fecha Cheque</Label>
+                    <Label htmlFor="numero">Número *</Label>
                     <Input
-                      id="fecha_cheque"
+                      id="numero"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fecha">Fecha *</Label>
+                    <Input
+                      id="fecha"
                       type="date"
-                      value={formData.fecha_cheque}
-                      onChange={(e) => setFormData({ ...formData, fecha_cheque: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="banco">Banco</Label>
-                    <Input
-                      id="banco"
-                      value={formData.banco}
-                      onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                      value={formData.fecha}
+                      onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                      required
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="numero_cheque">Número Cheque</Label>
-                    <Input
-                      id="numero_cheque"
-                      value={formData.numero_cheque}
-                      onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valor_cheque">Valor Cheque</Label>
-                    <Input
-                      id="valor_cheque"
-                      type="number"
-                      step="0.01"
-                      value={formData.valor_cheque}
-                      onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <Button type="submit" className="w-full">Crear Cobro</Button>
-            </form>
+                <div>
+                  <Label htmlFor="cliente_id">Cliente *</Label>
+                  <Select
+                    value={formData.cliente_id}
+                    onValueChange={handleClienteChange}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map((cliente) => (
+                        <SelectItem key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} ({cliente.codigo})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="visitador">Visitador</Label>
+                  <Input
+                    id="visitador"
+                    value={visitadores.find(v => v.id === formData.visitador)?.nombre || '-'}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="cod_farmacia">Código de Farmacia</Label>
+                  <Input
+                    id="cod_farmacia"
+                    value={formData.cod_farmacia}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="descripcion">Descripción</Label>
+                  <Input
+                    id="descripcion"
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="total">Total *</Label>
+                  <Input
+                    id="total"
+                    type="number"
+                    step="0.01"
+                    value={formData.total}
+                    onChange={(e) => setFormData({ ...formData, total: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <h3 className="font-medium">Información de Cheque (Opcional)</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="fecha_cheque">Fecha Cheque</Label>
+                      <Input
+                        id="fecha_cheque"
+                        type="date"
+                        value={formData.fecha_cheque}
+                        onChange={(e) => setFormData({ ...formData, fecha_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="banco">Banco</Label>
+                      <Input
+                        id="banco"
+                        value={formData.banco}
+                        onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="numero_cheque">Número Cheque</Label>
+                      <Input
+                        id="numero_cheque"
+                        value={formData.numero_cheque}
+                        onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="valor_cheque">Valor Cheque</Label>
+                      <Input
+                        id="valor_cheque"
+                        type="number"
+                        step="0.01"
+                        value={formData.valor_cheque}
+                        onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <h3 className="font-medium">Información Adicional</h3>
+                  <div>
+                    <Label htmlFor="otros">Comentarios</Label>
+                    <Input
+                      id="otros"
+                      value={formData.otros}
+                      onChange={(e) => setFormData({ ...formData, otros: e.target.value })}
+                      placeholder="Ingrese sus comentarios aquí..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="otros2">Otros 2</Label>
+                    <Input
+                      id="otros2"
+                      value={formData.otros2}
+                      onChange={(e) => setFormData({ ...formData, otros2: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="otros3">Otros 3</Label>
+                    <Input
+                      id="otros3"
+                      value={formData.otros3}
+                      onChange={(e) => setFormData({ ...formData, otros3: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-white pt-4 border-t">
+                  <div className="flex gap-4">
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" className="w-full">
+                      Confirmar Cobro
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
+
+      <div className="mb-6">
+        <Input
+          placeholder="Buscar en cobros..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
       
-      {cobros.length === 0 ? (
+      {cobrosFiltrados.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-600">No hay cobros registrados</p>
+          <p className="text-gray-600">
+            {searchTerm ? "No se encontraron cobros que coincidan con la búsqueda" : "No hay cobros registrados"}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {cobros.map((cobro) => (
-            <div
-              key={cobro.id}
-              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  {cobro.clientes.nombre}
-                  <span className="text-sm text-gray-500 ml-2">({cobro.clientes.codigo})</span>
-                </h2>
-                <p className="text-gray-600">{cobro.clientes.direccion}</p>
-                <p className="text-gray-600">{cobro.clientes.telefono}</p>
-                {cobro.clientes.nit && (
-                  <p className="text-gray-600">NIT: {cobro.clientes.nit}</p>
-                )}
-                <p className="text-gray-600">
-                  Saldo pendiente: ${cobro.clientes.saldo_pendiente.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              
-              <div className="mb-4">
-                <p className="text-sm text-gray-500">Número de cobro</p>
-                <p className="text-lg font-semibold">{cobro.numero}</p>
-                
-                <p className="text-sm text-gray-500 mt-2">Total</p>
-                <p className="text-lg font-semibold">
-                  ${cobro.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                </p>
-                
-                {cobro.descripcion && (
-                  <>
-                    <p className="text-sm text-gray-500 mt-2">Descripción</p>
-                    <p className="text-gray-600">{cobro.descripcion}</p>
-                  </>
-                )}
-              </div>
-              
-              <div className="text-sm text-gray-500">
-                <p>
-                  Fecha: {format(new Date(cobro.fecha), "PPP", { locale: es })}
-                </p>
-                {cobro.fecha_cheque && (
-                  <p>
-                    Fecha cheque: {format(new Date(cobro.fecha_cheque), "PPP", { locale: es })}
-                  </p>
-                )}
-                {cobro.banco && (
-                  <p>Banco: {cobro.banco}</p>
-                )}
-                {cobro.numero_cheque && (
-                  <p>Número de cheque: {cobro.numero_cheque}</p>
-                )}
-                {cobro.valor_cheque && (
-                  <p>
-                    Valor cheque: ${cobro.valor_cheque.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse table-auto text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-2 py-2 text-left w-20">Número</th>
+                <th className="px-2 py-2 text-left w-24">Fecha</th>
+                <th className="px-2 py-2 text-left w-48">Cliente</th>
+                <th className="px-2 py-2 text-left w-24">Código</th>
+                <th className="px-2 py-2 text-right w-24">Total</th>
+                <th className="px-2 py-2 text-right w-32">Saldo Pend.</th>
+                <th className="px-2 py-2 text-left w-48">Descripción</th>
+                <th className="px-2 py-2 text-left w-32">Visitador</th>
+                <th className="px-2 py-2 text-left w-24">Estado</th>
+                <th className="px-2 py-2 text-left w-48">Comentarios</th>
+                {user?.rol === 'admin' && <th className="px-2 py-2 text-left w-24">Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {cobrosFiltrados.map((cobro) => (
+                <tr key={cobro.id} className="border-b hover:bg-gray-50">
+                  <td className="px-2 py-2">{cobro.numero}</td>
+                  <td className="px-2 py-2">{format(new Date(cobro.fecha), "dd/MM/yyyy")}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.clientes.nombre}</td>
+                  <td className="px-2 py-2">{cobro.clientes.codigo}</td>
+                  <td className="px-2 py-2 text-right">Q{cobro.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-2 py-2 text-right">Q{cobro.clientes.saldo_pendiente.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.descripcion || '-'}</td>
+                  <td className="px-2 py-2 truncate max-w-[8rem]">{visitadores.find(v => v.id === cobro.visitador)?.nombre || '-'}</td>
+                  <td className="px-2 py-2">{cobro.Estado}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.otros || '-'}</td>
+                  {user?.rol === 'admin' && cobro.Estado === 'Pendiente' && (
+                    <td className="px-2 py-2">
+                      <Button variant="outline" size="sm" onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}>
+                        Confirmar
+                      </Button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

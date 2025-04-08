@@ -14,9 +14,9 @@ export interface Cobro {
   id: string
   numero: string
   fecha: string
-  cod_farmacia: string
+  cod_farmacia?: string
   cliente_id: string
-  descripcion: string
+  descripcion?: string
   total: number
   visitador: string
   fecha_cheque?: string
@@ -26,7 +26,19 @@ export interface Cobro {
   otros?: string
   otros2?: string
   otros3?: string
-  abonos: Abono[]
+  created_at: string
+  Estado: string
+  clientes: {
+    id: string
+    codigo: string
+    nombre: string
+    direccion: string
+    telefono: string
+    nit?: string
+    visitador: string
+    propietario?: string
+    saldo_pendiente: number
+  }
 }
 
 export interface Abono {
@@ -54,6 +66,7 @@ export interface Recibo {
 
 export interface VentaMensual {
   id: string
+  codigo: string
   fecha: string
   cliente_id: string
   visitador: string
@@ -73,6 +86,44 @@ export interface ProductoVenta {
 export interface Usuario {
   id: string
   email: string
-  rol: 'admin' | 'visitador'
   nombre: string
+  rol: 'admin' | 'visitador'
+  created_at: string
+  updated_at: string
+}
+
+export interface Producto {
+  id: string
+  codigo: string
+  nombre: string
+  costo_produccion: number | null
+  precio_venta: number
+  stock: number
+  stock_minimo: number
+  alerta_stock: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface HistorialStock {
+  id: string
+  producto_id: string
+  cantidad_anterior: number
+  cantidad_nueva: number
+  tipo_movimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE'
+  motivo: string | null
+  usuario_id: string
+  created_at: string
+}
+
+export interface PedidoInterno {
+  id: string
+  producto_id: string
+  cantidad_solicitada: number
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'COMPLETADO'
+  solicitante_id: string
+  aprobador_id: string | null
+  fecha_solicitud: string
+  fecha_aprobacion: string | null
+  fecha_completado: string | null
 } 

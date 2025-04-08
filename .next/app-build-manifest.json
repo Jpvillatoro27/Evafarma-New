@@ -16,25 +16,40 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/page.js"
     ],
-    "/login/page": [
+    "/(auth)/ventas/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
+      "static/chunks/app/(auth)/ventas/page.js"
     ],
-    "/(auth)/clientes/page": [
+    "/(auth)/ventas-mensuales/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/clientes/page.js"
+      "static/chunks/app/(auth)/ventas-mensuales/page.js"
+    ],
+    "/(auth)/productos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/productos/page.js"
     ],
     "/(auth)/cobros/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/cobros/page.js"
     ],
-    "/(auth)/ventas/page": [
+    "/(auth)/clientes/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/ventas/page.js"
+      "static/chunks/app/(auth)/clientes/page.js"
+    ],
+    "/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/login/page.js"
+    ],
+    "/(auth)/usuarios/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/usuarios/page.js"
     ]
   }
 }

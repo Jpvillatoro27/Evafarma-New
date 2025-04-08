@@ -1,7 +1,9 @@
 {
   "/login/page": "app/login/page.js",
-  "/(auth)/clientes/page": "app/(auth)/clientes/page.js",
   "/(auth)/ventas/page": "app/(auth)/ventas/page.js",
-  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
-  "/(auth)/page": "app/(auth)/page.js"
+  "/(auth)/page": "app/(auth)/page.js",
+  "/(auth)/clientes/page": "app/(auth)/clientes/page.js",
+  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js",
+  "/(auth)/usuarios/page": "app/(auth)/usuarios/page.js",
+  "/(auth)/cobros/page": "app/(auth)/cobros/page.js"
 }

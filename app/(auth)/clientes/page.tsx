@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { clientesService } from '@/lib/services'
+import { usuariosService } from '@/lib/services'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Cliente {
   id: string
@@ -19,10 +21,13 @@ interface Cliente {
   visitador: string
   propietario?: string
   saldo_pendiente: number
+  Departamento: string
 }
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -37,8 +42,53 @@ export default function ClientesPage() {
     nit: '',
     visitador: '',
     propietario: '',
-    saldo_pendiente: 0
+    saldo_pendiente: 0,
+    Departamento: ''
   })
+
+  // Lista de departamentos de Guatemala con sus códigos ISO
+  const departamentos = [
+    { nombre: 'Alta Verapaz', iso: 'AV' },
+    { nombre: 'Baja Verapaz', iso: 'BV' },
+    { nombre: 'Chimaltenango', iso: 'CM' },
+    { nombre: 'Chiquimula', iso: 'CQ' },
+    { nombre: 'El Progreso', iso: 'PR' },
+    { nombre: 'Escuintla', iso: 'ES' },
+    { nombre: 'Guatemala', iso: 'GU' },
+    { nombre: 'Huehuetenango', iso: 'HU' },
+    { nombre: 'Izabal', iso: 'IZ' },
+    { nombre: 'Jalapa', iso: 'JA' },
+    { nombre: 'Jutiapa', iso: 'JU' },
+    { nombre: 'Petén', iso: 'PE' },
+    { nombre: 'Quetzaltenango', iso: 'QZ' },
+    { nombre: 'Quiché', iso: 'QC' },
+    { nombre: 'Retalhuleu', iso: 'RE' },
+    { nombre: 'Sacatepéquez', iso: 'SA' },
+    { nombre: 'San Marcos', iso: 'SM' },
+    { nombre: 'Santa Rosa', iso: 'SR' },
+    { nombre: 'Sololá', iso: 'SO' },
+    { nombre: 'Suchitepéquez', iso: 'SU' },
+    { nombre: 'Totonicapán', iso: 'TO' },
+    { nombre: 'Zacapa', iso: 'ZA' }
+  ]
+
+  // Función para generar el código automáticamente
+  const generarCodigo = async (departamento: string) => {
+    try {
+      // Obtener el código ISO del departamento
+      const deptoInfo = departamentos.find(d => d.nombre === departamento)
+      if (!deptoInfo) {
+        throw new Error('Departamento no encontrado')
+      }
+
+      // Obtener el último código usado para este departamento desde la base de datos
+      const nuevoCodigo = await clientesService.getUltimoCodigoPorDepartamento(departamento, deptoInfo.iso)
+      return nuevoCodigo
+    } catch (error) {
+      console.error('Error al generar código:', error)
+      throw new Error('Error al generar el código del cliente')
+    }
+  }
 
   useEffect(() => {
     if (user?.id) {
@@ -47,26 +97,78 @@ export default function ClientesPage() {
   }, [user])
 
   useEffect(() => {
-    async function loadClientes() {
-      try {
-        setLoading(true)
-        const data = await clientesService.getClientes()
-        setClientes(data)
-      } catch (err) {
-        console.error('Error al cargar clientes:', err)
-        setError('Error al cargar los clientes')
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadClientes()
   }, [])
 
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setClientesFiltrados(clientes)
+      return
+    }
+
+    const termino = searchTerm.toLowerCase()
+    const filtered = clientes.filter(cliente => 
+      cliente.codigo.toLowerCase().includes(termino) ||
+      cliente.nombre.toLowerCase().includes(termino) ||
+      cliente.direccion?.toLowerCase().includes(termino) ||
+      cliente.telefono?.toLowerCase().includes(termino) ||
+      cliente.nit?.toLowerCase().includes(termino) ||
+      cliente.propietario?.toLowerCase().includes(termino) ||
+      cliente.Departamento?.toLowerCase().includes(termino) ||
+      cliente.saldo_pendiente.toString().includes(termino)
+    )
+    setClientesFiltrados(filtered)
+  }, [searchTerm, clientes])
+
+  const loadClientes = async () => {
+    try {
+      setLoading(true)
+      const data = await clientesService.getClientes()
+      const usuario = await usuariosService.getUsuarioActual()
+      
+      // Filtrar los clientes según el rol del usuario
+      const clientesFiltrados = usuario?.rol === 'admin'
+        ? data
+        : data.filter(cliente => cliente.visitador === usuario?.id)
+      
+      setClientes(clientesFiltrados)
+      setClientesFiltrados(clientesFiltrados)
+    } catch (error) {
+      console.error('Error al cargar clientes:', error)
+      setError('Error al cargar los clientes')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.Departamento) {
+      toast({
+        title: 'Error',
+        description: 'Por favor seleccione un departamento',
+        variant: 'destructive'
+      })
+      return
+    }
+
     try {
-      const nuevoCliente = await clientesService.createCliente(formData)
+      // Generar código automáticamente
+      const codigo = await generarCodigo(formData.Departamento)
+      if (!codigo) {
+        toast({
+          title: 'Error',
+          description: 'Error al generar el código del cliente',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const nuevoCliente = await clientesService.createCliente({
+        ...formData,
+        codigo
+      })
       setClientes([...clientes, nuevoCliente])
       setFormData({
         codigo: '',
@@ -76,7 +178,8 @@ export default function ClientesPage() {
         nit: '',
         visitador: user?.id || '',
         propietario: '',
-        saldo_pendiente: 0
+        saldo_pendiente: 0,
+        Departamento: ''
       })
       setIsDialogOpen(false)
       toast({
@@ -115,13 +218,23 @@ export default function ClientesPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="codigo">Código *</Label>
-                <Input
-                  id="codigo"
-                  value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                <Label htmlFor="Departamento">Departamento *</Label>
+                <Select
+                  value={formData.Departamento}
+                  onValueChange={(value) => setFormData({ ...formData, Departamento: value })}
                   required
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((depto) => (
+                      <SelectItem key={depto.nombre} value={depto.nombre}>
+                        {depto.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="nombre">Nombre *</Label>
@@ -170,8 +283,11 @@ export default function ClientesPage() {
                   id="saldo_pendiente"
                   type="number"
                   step="0.01"
-                  value={formData.saldo_pendiente}
-                  onChange={(e) => setFormData({ ...formData, saldo_pendiente: parseFloat(e.target.value) })}
+                  value={formData.saldo_pendiente || ''}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? 0 : parseFloat(e.target.value)
+                    setFormData({ ...formData, saldo_pendiente: value })
+                  }}
                 />
               </div>
               <Button type="submit" className="w-full">Crear Cliente</Button>
@@ -179,19 +295,54 @@ export default function ClientesPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {clientes.map((cliente) => (
-          <div key={cliente.id} className="border p-4 rounded-lg">
-            <h2 className="text-xl font-semibold">{cliente.nombre}</h2>
-            <p>Código: {cliente.codigo}</p>
-            {cliente.direccion && <p>Dirección: {cliente.direccion}</p>}
-            {cliente.telefono && <p>Teléfono: {cliente.telefono}</p>}
-            {cliente.nit && <p>NIT: {cliente.nit}</p>}
-            {cliente.propietario && <p>Propietario: {cliente.propietario}</p>}
-            <p>Saldo Pendiente: Q{cliente.saldo_pendiente.toFixed(2)}</p>
-          </div>
-        ))}
+      <div className="mb-6">
+        <Input
+          placeholder="Buscar en clientes..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
       </div>
+      {clientesFiltrados.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">
+            {searchTerm ? "No se encontraron clientes que coincidan con la búsqueda" : "No hay clientes registrados"}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse table-auto">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 text-left">Código</th>
+                <th className="px-4 py-2 text-left">Departamento</th>
+                <th className="px-4 py-2 text-left">Nombre</th>
+                <th className="px-4 py-2 text-left">Dirección</th>
+                <th className="px-4 py-2 text-left">Teléfono</th>
+                <th className="px-4 py-2 text-left">NIT</th>
+                <th className="px-4 py-2 text-left">Propietario</th>
+                <th className="px-4 py-2 text-right">Saldo Pendiente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientesFiltrados.map((cliente) => (
+                <tr key={cliente.id} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-2">{cliente.codigo}</td>
+                  <td className="px-4 py-2">{cliente.Departamento}</td>
+                  <td className="px-4 py-2">{cliente.nombre}</td>
+                  <td className="px-4 py-2">{cliente.direccion || '-'}</td>
+                  <td className="px-4 py-2">{cliente.telefono || '-'}</td>
+                  <td className="px-4 py-2">{cliente.nit || '-'}</td>
+                  <td className="px-4 py-2">{cliente.propietario || '-'}</td>
+                  <td className="px-4 py-2 text-right">
+                    Q{cliente.saldo_pendiente.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 } 
