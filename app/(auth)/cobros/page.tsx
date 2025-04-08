@@ -49,15 +49,6 @@ interface Visitador {
   email: string
 }
 
-// Función para formatear montos de dinero
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
-
 export default function CobrosPage() {
   const [cobros, setCobros] = useState<Cobro[]>([])
   const [cobrosFiltrados, setCobrosFiltrados] = useState<Cobro[]>([])
@@ -67,7 +58,6 @@ export default function CobrosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [clientes, setClientes] = useState<any[]>([])
   const [visitadores, setVisitadores] = useState<Visitador[]>([])
-  const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -89,6 +79,7 @@ export default function CobrosPage() {
   })
 
   const [selectedCliente, setSelectedCliente] = useState<any>(null)
+  const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
 
   useEffect(() => {
     if (user?.id) {
@@ -115,16 +106,14 @@ export default function CobrosPage() {
   }, [searchTerm, cobros])
 
   useEffect(() => {
-    if (cobros.length > 0) {
-      let filtrados = [...cobros]
-
-      // Aplicar filtro por visitador
-      if (filtroVisitador !== 'todos') {
-        filtrados = filtrados.filter(cobro => cobro.visitador === filtroVisitador)
-      }
-
-      setCobrosFiltrados(filtrados)
+    // Filtrar cobros por visitador
+    let filtrados = [...cobros]
+    
+    if (filtroVisitador !== 'todos') {
+      filtrados = filtrados.filter(cobro => cobro.visitador === filtroVisitador)
     }
+
+    setCobrosFiltrados(filtrados)
   }, [cobros, filtroVisitador])
 
   const loadCobros = async () => {
@@ -315,7 +304,7 @@ export default function CobrosPage() {
     }
   }
 
-  const handleConfirmarCobro = async (cobroId: string) => {
+  const handleConfirmarCobro = async (cobroId: string, clienteId: string, total: number) => {
     if (!window.confirm('¿Está seguro de confirmar este cobro?')) {
       return;
     }
@@ -323,6 +312,14 @@ export default function CobrosPage() {
     try {
       // Confirmar el cobro
       await cobrosService.confirmarCobro(cobroId)
+      
+      // Actualizar el saldo pendiente del cliente
+      await clientesService.actualizarSaldo(clienteId, -total)
+      
+      toast({
+        title: 'Cobro confirmado',
+        description: 'El cobro ha sido confirmado y el saldo actualizado',
+      })
       
       // Recargar los cobros para actualizar la vista
       loadCobros()
@@ -366,279 +363,266 @@ export default function CobrosPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Cobros</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>Nuevo Cobro</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Nuevo Cobro</DialogTitle>
+              <DialogTitle>Crear Nuevo Cobro</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="numero">Número *</Label>
-                  <Input
-                    id="numero"
-                    value={formData.numero}
-                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fecha">Fecha *</Label>
-                  <Input
-                    id="fecha"
-                    type="date"
-                    value={formData.fecha}
-                    onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="cliente_id">Cliente *</Label>
-                <Select
-                  value={formData.cliente_id}
-                  onValueChange={handleClienteChange}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre} ({cliente.codigo})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="visitador">Visitador</Label>
-                <Input
-                  id="visitador"
-                  value={visitadores.find(v => v.id === formData.visitador)?.nombre || '-'}
-                  readOnly
-                  className="bg-gray-100"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="cod_farmacia">Código de Farmacia</Label>
-                <Input
-                  id="cod_farmacia"
-                  value={formData.cod_farmacia}
-                  readOnly
-                  className="bg-gray-100"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="descripcion">Descripción</Label>
-                <Input
-                  id="descripcion"
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="total">Total *</Label>
-                <Input
-                  id="total"
-                  type="number"
-                  step="0.01"
-                  value={formData.total}
-                  onChange={(e) => setFormData({ ...formData, total: Number(e.target.value) })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-4 border-t pt-4 mt-4">
-                <h3 className="font-medium">Información de Cheque (Opcional)</h3>
+            <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="fecha_cheque">Fecha Cheque</Label>
+                    <Label htmlFor="numero">Número *</Label>
                     <Input
-                      id="fecha_cheque"
+                      id="numero"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fecha">Fecha *</Label>
+                    <Input
+                      id="fecha"
                       type="date"
-                      value={formData.fecha_cheque}
-                      onChange={(e) => setFormData({ ...formData, fecha_cheque: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="banco">Banco</Label>
-                    <Input
-                      id="banco"
-                      value={formData.banco}
-                      onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                      value={formData.fecha}
+                      onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                      required
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="numero_cheque">Número Cheque</Label>
-                    <Input
-                      id="numero_cheque"
-                      value={formData.numero_cheque}
-                      onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valor_cheque">Valor Cheque</Label>
-                    <Input
-                      id="valor_cheque"
-                      type="number"
-                      step="0.01"
-                      value={formData.valor_cheque}
-                      onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="space-y-4 border-t pt-4 mt-4">
-                <h3 className="font-medium">Información Adicional</h3>
                 <div>
-                  <Label htmlFor="otros">Comentarios</Label>
-                  <Input
-                    id="otros"
-                    value={formData.otros}
-                    onChange={(e) => setFormData({ ...formData, otros: e.target.value })}
-                    placeholder="Ingrese sus comentarios aquí..."
-                  />
+                  <Label htmlFor="cliente_id">Cliente *</Label>
+                  <Select
+                    value={formData.cliente_id}
+                    onValueChange={handleClienteChange}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map((cliente) => (
+                        <SelectItem key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} ({cliente.codigo})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <Label htmlFor="otros2">Otros 2</Label>
-                  <Input
-                    id="otros2"
-                    value={formData.otros2}
-                    onChange={(e) => setFormData({ ...formData, otros2: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="otros3">Otros 3</Label>
-                  <Input
-                    id="otros3"
-                    value={formData.otros3}
-                    onChange={(e) => setFormData({ ...formData, otros3: e.target.value })}
-                  />
-                </div>
-              </div>
 
-              <div className="sticky bottom-0 bg-white pt-4 border-t">
-                <div className="flex gap-4">
-                  <Button type="button" variant="outline" className="w-full" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="w-full">
-                    Confirmar Cobro
-                  </Button>
+                <div>
+                  <Label htmlFor="visitador">Visitador</Label>
+                  <Input
+                    id="visitador"
+                    value={visitadores.find(v => v.id === formData.visitador)?.nombre || '-'}
+                    readOnly
+                    className="bg-gray-100"
+                  />
                 </div>
-              </div>
-            </form>
+
+                <div>
+                  <Label htmlFor="cod_farmacia">Código de Farmacia</Label>
+                  <Input
+                    id="cod_farmacia"
+                    value={formData.cod_farmacia}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="descripcion">Descripción</Label>
+                  <Input
+                    id="descripcion"
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="total">Total *</Label>
+                  <Input
+                    id="total"
+                    type="number"
+                    step="0.01"
+                    value={formData.total}
+                    onChange={(e) => setFormData({ ...formData, total: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <h3 className="font-medium">Información de Cheque (Opcional)</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="fecha_cheque">Fecha Cheque</Label>
+                      <Input
+                        id="fecha_cheque"
+                        type="date"
+                        value={formData.fecha_cheque}
+                        onChange={(e) => setFormData({ ...formData, fecha_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="banco">Banco</Label>
+                      <Input
+                        id="banco"
+                        value={formData.banco}
+                        onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="numero_cheque">Número Cheque</Label>
+                      <Input
+                        id="numero_cheque"
+                        value={formData.numero_cheque}
+                        onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="valor_cheque">Valor Cheque</Label>
+                      <Input
+                        id="valor_cheque"
+                        type="number"
+                        step="0.01"
+                        value={formData.valor_cheque}
+                        onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <h3 className="font-medium">Información Adicional</h3>
+                  <div>
+                    <Label htmlFor="otros">Comentarios</Label>
+                    <Input
+                      id="otros"
+                      value={formData.otros}
+                      onChange={(e) => setFormData({ ...formData, otros: e.target.value })}
+                      placeholder="Ingrese sus comentarios aquí..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="otros2">Otros 2</Label>
+                    <Input
+                      id="otros2"
+                      value={formData.otros2}
+                      onChange={(e) => setFormData({ ...formData, otros2: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="otros3">Otros 3</Label>
+                    <Input
+                      id="otros3"
+                      value={formData.otros3}
+                      onChange={(e) => setFormData({ ...formData, otros3: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-white pt-4 border-t">
+                  <div className="flex gap-4">
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" className="w-full">
+                      Confirmar Cobro
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1">
-          <Input
-            type="text"
-            placeholder="Buscar por número, cliente, descripción o monto..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <div className="w-64">
-          <Select value={filtroVisitador} onValueChange={setFiltroVisitador}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por visitador" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los visitadores</SelectItem>
-              {visitadores.map((visitador) => (
-                <SelectItem key={visitador.id} value={visitador.id}>
-                  {visitador.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="mb-6">
+        <Input
+          placeholder="Buscar en cobros..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
       </div>
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
+      
+      <div className="mb-4">
+        <Select
+          value={filtroVisitador}
+          onValueChange={setFiltroVisitador}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filtrar por visitador" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los visitadores</SelectItem>
+            {visitadores.map(visitador => (
+              <SelectItem key={visitador.id} value={visitador.id}>
+                {visitador.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {cobrosFiltrados.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">
+            {searchTerm ? "No se encontraron cobros que coincidan con la búsqueda" : "No hay cobros registrados"}
+          </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitador</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cobrosFiltrados.map((cobro) => (
-                  <tr key={cobro.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{cobro.numero}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {cobro.clientes?.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">{cobro.descripcion}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(cobro.total)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {visitadores.find(v => v.id === cobro.visitador)?.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        cobro.Estado === 'confirmado' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Pendiente'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleConfirmarCobro(cobro.id)}
-                        disabled={cobro.Estado === 'confirmado'}
-                      >
-                        {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Confirmar'}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse table-auto text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-2 py-2 text-left w-20">Número</th>
+                <th className="px-2 py-2 text-left w-24">Fecha</th>
+                <th className="px-2 py-2 text-left w-48">Cliente</th>
+                <th className="px-2 py-2 text-left w-24">Código</th>
+                <th className="px-2 py-2 text-right w-24">Total</th>
+                <th className="px-2 py-2 text-right w-32">Saldo Pend.</th>
+                <th className="px-2 py-2 text-left w-48">Descripción</th>
+                <th className="px-2 py-2 text-left w-32">Visitador</th>
+                <th className="px-2 py-2 text-left w-24">Estado</th>
+                <th className="px-2 py-2 text-left w-48">Comentarios</th>
+                {user?.rol === 'admin' && <th className="px-2 py-2 text-left w-24">Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {cobrosFiltrados.map((cobro) => (
+                <tr key={cobro.id} className="border-b hover:bg-gray-50">
+                  <td className="px-2 py-2">{cobro.numero}</td>
+                  <td className="px-2 py-2">{format(new Date(cobro.fecha), "dd/MM/yyyy")}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.clientes.nombre}</td>
+                  <td className="px-2 py-2">{cobro.clientes.codigo}</td>
+                  <td className="px-2 py-2 text-right">Q{cobro.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-2 py-2 text-right">Q{cobro.clientes.saldo_pendiente.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.descripcion || '-'}</td>
+                  <td className="px-2 py-2 truncate max-w-[8rem]">{visitadores.find(v => v.id === cobro.visitador)?.nombre || '-'}</td>
+                  <td className="px-2 py-2">{cobro.Estado}</td>
+                  <td className="px-2 py-2 truncate max-w-[12rem]">{cobro.otros || '-'}</td>
+                  {user?.rol === 'admin' && cobro.Estado === 'Pendiente' && (
+                    <td className="px-2 py-2">
+                      <Button variant="outline" size="sm" onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}>
+                        Confirmar
                       </Button>
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
