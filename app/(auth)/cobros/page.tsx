@@ -49,6 +49,15 @@ interface Visitador {
   email: string
 }
 
+// Función para formatear montos de dinero
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('es-GT', {
+    style: 'currency',
+    currency: 'GTQ',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
 export default function CobrosPage() {
   const [cobros, setCobros] = useState<Cobro[]>([])
   const [cobrosFiltrados, setCobrosFiltrados] = useState<Cobro[]>([])
