@@ -33,7 +33,10 @@ export default function UsuariosPage() {
       try {
         setLoading(true)
         const data = await usuariosService.getVisitadores()
-        setUsuarios(data)
+        setUsuarios(data.map(usuario => ({
+          ...usuario,
+          rol: 'visitador' as const
+        })))
       } catch (err) {
         console.error('Error al cargar visitadores:', err)
         setError('Error al cargar los visitadores')

@@ -16,6 +16,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/page.js"
     ],
+    "/(auth)/clientes/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/clientes/page.js"
+    ],
+    "/(auth)/cobros/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/cobros/page.js"
+    ],
     "/(auth)/ventas/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -30,21 +40,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/productos/page.js"
-    ],
-    "/(auth)/cobros/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/cobros/page.js"
-    ],
-    "/(auth)/clientes/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/clientes/page.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
     ],
     "/(auth)/usuarios/page": [
       "static/chunks/webpack.js",
