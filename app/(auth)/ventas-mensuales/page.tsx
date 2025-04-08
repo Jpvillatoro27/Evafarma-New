@@ -40,7 +40,14 @@ export default function VentasMensualesPage() {
       setLoading(true)
       // Obtener el usuario actual
       const usuarioActual = await usuariosService.getUsuarioActual()
-      setUsuario(usuarioActual)
+      if (usuarioActual) {
+        setUsuario({
+          id: usuarioActual.id,
+          email: usuarioActual.email || '',
+          nombre: usuarioActual.nombre,
+          rol: usuarioActual.rol as 'admin' | 'visitador'
+        })
+      }
       console.log('Usuario actual:', usuarioActual)
       
       // Obtener todos los visitadores
