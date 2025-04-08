@@ -112,9 +112,27 @@ export default function CobrosPage() {
       const usuario = await usuariosService.getUsuarioActual()
       
       // Filtrar los cobros según el rol del usuario
-      const cobrosFiltrados = usuario?.rol === 'admin'
+      const cobrosFiltrados = (usuario?.rol === 'admin'
         ? data
         : data.filter(cobro => cobro.visitador === usuario?.id)
+      ).map(cobro => {
+        const cliente = Array.isArray(cobro.clientes) ? cobro.clientes[0] : cobro.clientes
+        return {
+          ...cobro,
+          Estado: cobro.Estado || 'pendiente',
+          clientes: cliente ? {
+            id: cliente.id,
+            codigo: cliente.codigo,
+            nombre: cliente.nombre,
+            direccion: cliente.direccion,
+            telefono: cliente.telefono,
+            nit: cliente.nit,
+            visitador: cliente.visitador,
+            propietario: cliente.propietario,
+            saldo_pendiente: cliente.saldo_pendiente
+          } : null
+        }
+      }) as Cobro[]
       
       setCobros(cobrosFiltrados)
       setCobrosFiltrados(cobrosFiltrados)
