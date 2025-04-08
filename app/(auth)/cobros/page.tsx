@@ -408,6 +408,7 @@ export default function CobrosPage() {
                 <th className="px-4 py-2 text-left">Número</th>
                 <th className="px-4 py-2 text-left">Fecha</th>
                 <th className="px-4 py-2 text-left">Cliente</th>
+                <th className="px-4 py-2 text-left">Visitador</th>
                 <th className="px-4 py-2 text-left">Descripción</th>
                 <th className="px-4 py-2 text-right">Total</th>
                 <th className="px-4 py-2 text-left">Estado</th>
@@ -424,6 +425,9 @@ export default function CobrosPage() {
                   <td className="px-4 py-2">
                     {cobro.clientes?.nombre} ({cobro.cod_farmacia})
                   </td>
+                  <td className="px-4 py-2">
+                    {visitadores.find(v => v.id === cobro.visitador)?.nombre || cobro.visitador}
+                  </td>
                   <td className="px-4 py-2">{cobro.descripcion || '-'}</td>
                   <td className="px-4 py-2 text-right">
                     Q{cobro.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
@@ -438,16 +442,17 @@ export default function CobrosPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                      disabled={cobro.Estado === 'confirmado'}
-                      title="Confirmar cobro"
-                      className="hover:bg-gray-100"
-                    >
-                      <CheckCircleIcon className="h-5 w-5" />
-                    </Button>
+                    {cobro.Estado === 'pendiente' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
+                        title="Confirmar cobro"
+                        className="hover:bg-gray-100"
+                      >
+                        <CheckCircleIcon className="h-5 w-5" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
