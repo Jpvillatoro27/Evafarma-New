@@ -82,6 +82,9 @@ export default function ProductosPage() {
         precio_venta: parseFloat(nuevoProducto.precio_venta),
         stock: parseInt(nuevoProducto.stock),
         stock_minimo: parseInt(nuevoProducto.stock_minimo),
+        alerta_stock: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       toast.success('Producto creado exitosamente')
       setShowDialog(false)
