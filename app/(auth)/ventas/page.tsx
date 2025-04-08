@@ -423,10 +423,6 @@ export default function VentasPage() {
         <Dialog 
           open={isDialogOpen} 
           onOpenChange={setIsDialogOpen}
-          onOpenAutoFocus={(e) => {
-            // Prevenir el foco automático en el primer elemento
-            e.preventDefault()
-          }}
         >
           <DialogTrigger asChild>
             <Button>Nueva Venta</Button>
