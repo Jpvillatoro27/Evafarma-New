@@ -13,6 +13,8 @@ export type Toast = {
   description?: string
   action?: ToastActionElement
   variant?: "default" | "destructive"
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const actionTypes = {
@@ -140,7 +142,7 @@ function dispatch(action: Action) {
   })
 }
 
-export function toast({ ...props }: Omit<Toast, "id">) {
+export function toast(props: Omit<Toast, "id">) {
   const id = genId()
 
   const update = (props: Omit<Toast, "id">) =>

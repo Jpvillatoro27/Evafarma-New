@@ -118,11 +118,21 @@ export default function VentasPage() {
   const loadVentas = async () => {
     try {
       const data = await ventasService.getVentas()
-      const ventasFormateadas = data.map(venta => ({
-        ...venta,
-        clientes: Array.isArray(venta.clientes) ? venta.clientes[0] : venta.clientes,
-        productos: venta.productos || []
-      })) as Venta[]
+      const ventasFormateadas = data.map(venta => {
+        const cliente = Array.isArray(venta.clientes) ? venta.clientes[0] : venta.clientes
+        return {
+          ...venta,
+          clientes: {
+            id: cliente.id,
+            nombre: cliente.nombre,
+            direccion: cliente.direccion,
+            telefono: cliente.telefono,
+            nit: cliente.nit,
+            saldo_pendiente: cliente.saldo_pendiente
+          },
+          productos: venta.productos || []
+        } as Venta
+      })
       setVentas(ventasFormateadas)
     } catch (error) {
       console.error('Error al cargar ventas:', error)
