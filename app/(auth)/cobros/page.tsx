@@ -127,7 +127,7 @@ export default function CobrosPage() {
             direccion: cliente.direccion,
             telefono: cliente.telefono,
             nit: cliente.nit,
-            visitador: cliente.visitador,
+            visitador: usuario?.id || '',
             propietario: cliente.propietario,
             saldo_pendiente: cliente.saldo_pendiente
           } : null
