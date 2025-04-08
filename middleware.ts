@@ -27,6 +27,16 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
           response.cookies.set({
             name,
             value,
@@ -34,6 +44,16 @@ export async function middleware(request: NextRequest) {
           })
         },
         remove(name: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
           response.cookies.set({
             name,
             value: '',
@@ -44,15 +64,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  await supabase.auth.getSession()
 
-  // Si el usuario no está autenticado y está intentando acceder a una ruta protegida
-  if (!session && request.nextUrl.pathname !== '/login' && request.nextUrl.pathname !== '/register') {
+  // Si el usuario no está autenticado y no está en la página de login
+  if (!session && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si el usuario está autenticado y está en la página de login o registro
-  if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
+  // Si el usuario está autenticado y está en la página de login
+  if (session && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -61,5 +81,14 @@ export async function middleware(request: NextRequest) {
 
 // Configuración de las rutas que deben pasar por el middleware
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+  ],
 } 
