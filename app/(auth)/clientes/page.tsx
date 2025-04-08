@@ -31,6 +31,8 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [visitadores, setVisitadores] = useState<any[]>([])
+  const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -101,24 +103,43 @@ export default function ClientesPage() {
   }, [])
 
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setClientesFiltrados(clientes)
-      return
+    const loadVisitadores = async () => {
+      try {
+        const data = await usuariosService.getVisitadores()
+        setVisitadores(data)
+      } catch (error) {
+        console.error('Error al cargar visitadores:', error)
+      }
     }
+    loadVisitadores()
+  }, [])
 
-    const termino = searchTerm.toLowerCase()
-    const filtered = clientes.filter(cliente => 
-      cliente.codigo.toLowerCase().includes(termino) ||
-      cliente.nombre.toLowerCase().includes(termino) ||
-      cliente.direccion?.toLowerCase().includes(termino) ||
-      cliente.telefono?.toLowerCase().includes(termino) ||
-      cliente.nit?.toLowerCase().includes(termino) ||
-      cliente.propietario?.toLowerCase().includes(termino) ||
-      cliente.Departamento?.toLowerCase().includes(termino) ||
-      cliente.saldo_pendiente.toString().includes(termino)
-    )
+  useEffect(() => {
+    // Aplicar filtros de búsqueda y visitador
+    let filtered = [...clientes]
+    
+    // Filtrar por término de búsqueda
+    if (searchTerm.trim()) {
+      const termino = searchTerm.toLowerCase()
+      filtered = filtered.filter(cliente => 
+        cliente.codigo.toLowerCase().includes(termino) ||
+        cliente.nombre.toLowerCase().includes(termino) ||
+        cliente.direccion?.toLowerCase().includes(termino) ||
+        cliente.telefono?.toLowerCase().includes(termino) ||
+        cliente.nit?.toLowerCase().includes(termino) ||
+        cliente.propietario?.toLowerCase().includes(termino) ||
+        cliente.Departamento?.toLowerCase().includes(termino) ||
+        cliente.saldo_pendiente.toString().includes(termino)
+      )
+    }
+    
+    // Filtrar por visitador
+    if (filtroVisitador !== 'todos') {
+      filtered = filtered.filter(cliente => cliente.visitador === filtroVisitador)
+    }
+    
     setClientesFiltrados(filtered)
-  }, [searchTerm, clientes])
+  }, [searchTerm, clientes, filtroVisitador])
 
   const loadClientes = async () => {
     try {
@@ -295,13 +316,30 @@ export default function ClientesPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="mb-6">
+      <div className="flex gap-4 mb-6">
         <Input
           placeholder="Buscar en clientes..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md"
         />
+        
+        <Select
+          value={filtroVisitador}
+          onValueChange={setFiltroVisitador}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filtrar por visitador" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los visitadores</SelectItem>
+            {visitadores.map(visitador => (
+              <SelectItem key={visitador.id} value={visitador.id}>
+                {visitador.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       {clientesFiltrados.length === 0 ? (
         <div className="text-center py-8">
@@ -315,27 +353,37 @@ export default function ClientesPage() {
             <thead>
               <tr className="bg-gray-100">
                 <th className="px-4 py-2 text-left">Código</th>
-                <th className="px-4 py-2 text-left">Departamento</th>
                 <th className="px-4 py-2 text-left">Nombre</th>
                 <th className="px-4 py-2 text-left">Dirección</th>
                 <th className="px-4 py-2 text-left">Teléfono</th>
                 <th className="px-4 py-2 text-left">NIT</th>
                 <th className="px-4 py-2 text-left">Propietario</th>
+                <th className="px-4 py-2 text-left">Departamento</th>
                 <th className="px-4 py-2 text-right">Saldo Pendiente</th>
+                <th className="px-4 py-2 text-left">Visitador</th>
+                <th className="px-4 py-2 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {clientesFiltrados.map((cliente) => (
                 <tr key={cliente.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-2">{cliente.codigo}</td>
-                  <td className="px-4 py-2">{cliente.Departamento}</td>
                   <td className="px-4 py-2">{cliente.nombre}</td>
                   <td className="px-4 py-2">{cliente.direccion || '-'}</td>
                   <td className="px-4 py-2">{cliente.telefono || '-'}</td>
                   <td className="px-4 py-2">{cliente.nit || '-'}</td>
                   <td className="px-4 py-2">{cliente.propietario || '-'}</td>
+                  <td className="px-4 py-2">{cliente.Departamento}</td>
                   <td className="px-4 py-2 text-right">
-                    Q{cliente.saldo_pendiente.toFixed(2)}
+                    Q{cliente.saldo_pendiente.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-2">
+                    {visitadores.find(v => v.id === cliente.visitador)?.nombre || '-'}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/clientes/${cliente.id}/cobro`}>Ver Cobros</a>
+                    </Button>
                   </td>
                 </tr>
               ))}
