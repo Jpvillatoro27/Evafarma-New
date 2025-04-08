@@ -11,8 +11,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CheckSquare } from 'lucide-react'
+import { CheckCircleIcon } from '@heroicons/react/24/outline'
 
 interface Cobro {
   id: string
@@ -438,24 +437,17 @@ export default function CobrosPage() {
                       {cobro.Estado}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-center space-x-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                            disabled={cobro.Estado === 'confirmado'}
-                          >
-                            <CheckSquare className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Confirmar cobro</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                  <td className="px-4 py-2 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
+                      disabled={cobro.Estado === 'confirmado'}
+                      title="Confirmar cobro"
+                      className="hover:bg-gray-100"
+                    >
+                      <CheckCircleIcon className="h-5 w-5" />
+                    </Button>
                   </td>
                 </tr>
               ))}
