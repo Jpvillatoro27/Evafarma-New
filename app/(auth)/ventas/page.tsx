@@ -73,7 +73,7 @@ export default function VentasPage() {
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null)
   const [rastreo, setRastreo] = useState('')
   const [isRastreoDialogOpen, setIsRastreoDialogOpen] = useState(false)
-  const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'completado'>('pendiente')
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'completado' | 'anulado'>('pendiente')
   const [isEstadoDialogOpen, setIsEstadoDialogOpen] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
 
@@ -364,7 +364,7 @@ export default function VentasPage() {
 
   const handleCambiarEstado = async (venta: Venta) => {
     setVentaSeleccionada(venta)
-    setEstadoSeleccionado(venta.estado as 'pendiente' | 'enviado' | 'completado')
+    setEstadoSeleccionado(venta.estado as 'pendiente' | 'enviado' | 'completado' | 'anulado')
     setIsEstadoDialogOpen(true)
   }
 
@@ -749,7 +749,7 @@ export default function VentasPage() {
               <Label htmlFor="estado">Estado</Label>
               <Select
                 value={estadoSeleccionado}
-                onValueChange={(value: 'pendiente' | 'enviado' | 'completado') => setEstadoSeleccionado(value)}
+                onValueChange={(value: 'pendiente' | 'enviado' | 'completado' | 'anulado') => setEstadoSeleccionado(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
