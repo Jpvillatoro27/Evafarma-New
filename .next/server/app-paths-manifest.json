@@ -1,4 +1,14 @@
 {
+  "/_not-found": "app/_not-found.js",
+  "/api/auth/user/route": "app/api/auth/user/route.js",
   "/login/page": "app/login/page.js",
-  "/(auth)/page": "app/(auth)/page.js"
+  "/test-connection/page": "app/test-connection/page.js",
+  "/register/page": "app/register/page.js",
+  "/(auth)/clientes/page": "app/(auth)/clientes/page.js",
+  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
+  "/(auth)/page": "app/(auth)/page.js",
+  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js",
+  "/(auth)/ventas/page": "app/(auth)/ventas/page.js",
+  "/(auth)/productos/page": "app/(auth)/productos/page.js",
+  "/(auth)/usuarios/page": "app/(auth)/usuarios/page.js"
 }
