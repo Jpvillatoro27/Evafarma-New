@@ -5,9 +5,10 @@ import { ventasService, usuariosService, cobrosService } from '@/lib/services'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface VentaMensual {
-  mes: number
-  año: number
+  mes: string
   total: number
+  cantidad: number
+  promedio: number
 }
 
 interface CobroMensual {
@@ -31,6 +32,7 @@ interface Usuario {
 }
 
 export default function VentasMensualesPage() {
+  const [ventasMensuales, setVentasMensuales] = useState<VentaMensual[]>([])
   const [visitadores, setVisitadores] = useState<Visitador[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +71,33 @@ export default function VentasMensualesPage() {
       
       console.log('Visitadores filtrados:', visitadoresFiltrados)
       
+      // Procesar ventas por mes
+      const ventasPorMes = ventas.reduce((acc: { [key: string]: VentaMensual }, venta) => {
+        const mes = new Date(venta.fecha).toISOString().slice(0, 7) // Formato YYYY-MM
+        if (!acc[mes]) {
+          acc[mes] = {
+            mes,
+            total: 0,
+            cantidad: 0,
+            promedio: 0
+          }
+        }
+        acc[mes].total += venta.total
+        acc[mes].cantidad += 1
+        return acc
+      }, {})
+
+      // Calcular promedios
+      Object.values(ventasPorMes).forEach(venta => {
+        venta.promedio = venta.total / venta.cantidad
+      })
+
+      // Convertir a array y ordenar por mes
+      const ventasMensualesArray = Object.values(ventasPorMes)
+        .sort((a, b) => b.mes.localeCompare(a.mes))
+
+      setVentasMensuales(ventasMensualesArray)
+
       // Procesar las ventas y cobros por visitador
       const visitadoresData = visitadoresFiltrados.map(visitador => {
         // Filtrar ventas del visitador
@@ -83,7 +112,7 @@ export default function VentasMensualesPage() {
         console.log(`Cobros para visitador ${visitador.nombre}:`, cobrosVisitador)
         
         // Agrupar ventas por mes
-        const ventasPorMes = ventasVisitador.reduce((acc: VentaMensual[], venta) => {
+        const ventasPorMesVisitador = ventasVisitador.reduce((acc: VentaMensual[], venta) => {
           const fecha = new Date(venta.fecha)
           const mes = fecha.getMonth() + 1
           const año = fecha.getFullYear()
@@ -117,7 +146,7 @@ export default function VentasMensualesPage() {
         return {
           id: visitador.id,
           nombre: visitador.nombre,
-          ventas: ventasPorMes.sort((a, b) => {
+          ventas: ventasPorMesVisitador.sort((a, b) => {
             if (a.año !== b.año) return b.año - a.año
             return b.mes - a.mes
           }),
@@ -168,6 +197,13 @@ export default function VentasMensualesPage() {
     return <div className="text-red-600">{error}</div>
   }
   
+  // Calcular totales
+  const totalVentas = ventasMensuales.reduce((sum, venta) => sum + venta.total, 0)
+  const ventasPromedio = ventasMensuales.length > 0 
+    ? totalVentas / ventasMensuales.length 
+    : 0
+  const ventasMesActual = ventasMensuales[0]?.total || 0
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Ventas Mensuales</h1>
