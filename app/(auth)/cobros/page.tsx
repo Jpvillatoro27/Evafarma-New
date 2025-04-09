@@ -370,6 +370,89 @@ export default function CobrosPage() {
         <Button onClick={() => setIsDialogOpen(true)}>Nuevo Cobro</Button>
       </div>
 
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Nuevo Cobro</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="numero">Número de Cobro</Label>
+                <Input
+                  id="numero"
+                  value={formData.numero}
+                  onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="fecha">Fecha</Label>
+                <Input
+                  id="fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="cliente">Cliente</Label>
+              <Select
+                value={formData.cliente_id}
+                onValueChange={handleClienteChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map(cliente => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nombre} ({cliente.codigo})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="descripcion">Descripción</Label>
+              <Input
+                id="descripcion"
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="total">Total</Label>
+              <Input
+                id="total"
+                type="number"
+                value={formData.total}
+                onChange={(e) => setFormData({ ...formData, total: parseFloat(e.target.value) || 0 })}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Crear Cobro
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex gap-4 mb-6">
         <Input
           placeholder="Buscar en cobros..."
