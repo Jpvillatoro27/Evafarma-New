@@ -3,7 +3,7 @@
 import * as React from "react"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // 5 segundos
 
 type ToastActionElement = React.ReactElement<any, string | React.JSXElementConstructor<any>>
 
@@ -185,9 +185,14 @@ export function useToast() {
     }
   }, [state])
 
+  const dismiss = React.useCallback((toastId?: string) => {
+    dispatch({ type: "DISMISS_TOAST", toastId })
+    dispatch({ type: "REMOVE_TOAST", toastId })
+  }, [])
+
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    dismiss
   }
 } 
