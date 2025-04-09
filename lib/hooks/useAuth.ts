@@ -1,20 +1,8 @@
-'use client'
-
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Usuario } from '@/types'
 
-interface AuthContextType {
-  user: Usuario | null
-  loading: boolean
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-})
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function useAuth() {
   const [user, setUser] = useState<Usuario | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -65,17 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth debe ser usado dentro de un AuthProvider')
+  return {
+    user,
+    loading,
+    signOut: () => supabase.auth.signOut()
   }
-  return context
 } 
