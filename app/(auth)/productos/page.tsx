@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([])
@@ -31,14 +32,21 @@ export default function ProductosPage() {
     producto_id: '',
     cantidad: '',
   })
+  const router = useRouter()
 
   useEffect(() => {
     const checkAdmin = async () => {
       try {
         const usuario = await usuariosService.getUsuarioActual()
-        setIsAdmin(usuario?.rol === 'admin')
+        const esAdmin = usuario?.rol === 'admin'
+        setIsAdmin(esAdmin)
+        
+        if (!esAdmin) {
+          router.push('/')
+        }
       } catch (error) {
         console.error('Error al verificar rol:', error)
+        router.push('/')
       }
     }
     checkAdmin()
