@@ -382,8 +382,9 @@ export default function VentasPage() {
 
       if (error) throw error
 
-      // Si el estado es "anulado", restar el total del saldo pendiente del cliente
+      // Si el estado es "anulado"
       if (estadoSeleccionado === 'anulado') {
+        // Restar el total del saldo pendiente del cliente
         const nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
         
         // Actualizar el saldo del cliente
@@ -394,7 +395,32 @@ export default function VentasPage() {
 
         if (saldoError) throw saldoError
 
-        // Actualizar el saldo en la interfaz
+        // Actualizar el stock de cada producto
+        if (ventaSeleccionada.productos) {
+          for (const producto of ventaSeleccionada.productos) {
+            // Obtener el stock actual
+            const { data: productoActual } = await supabase
+              .from('productos')
+              .select('stock')
+              .eq('id', producto.id)
+              .single()
+
+            if (productoActual) {
+              // Calcular el nuevo stock sumando la cantidad vendida
+              const nuevoStock = productoActual.stock + producto.cantidad
+
+              // Actualizar el stock en la base de datos
+              const { error: stockError } = await supabase
+                .from('productos')
+                .update({ stock: nuevoStock })
+                .eq('id', producto.id)
+
+              if (stockError) throw stockError
+            }
+          }
+        }
+
+        // Actualizar la interfaz
         setVentas(ventas.map(v => {
           if (v.id === ventaSeleccionada.id) {
             return {
@@ -408,6 +434,9 @@ export default function VentasPage() {
           }
           return v
         }))
+
+        // Recargar los productos para actualizar el stock en la interfaz
+        loadProductos()
       } else {
         // Actualizar solo el estado si no es "anulado"
         setVentas(ventas.map(v => 
@@ -421,7 +450,7 @@ export default function VentasPage() {
       toast({
         title: 'Estado actualizado',
         description: estadoSeleccionado === 'anulado' 
-          ? 'La venta ha sido anulada y el saldo del cliente ha sido actualizado'
+          ? 'La venta ha sido anulada, el saldo del cliente y el stock han sido actualizados'
           : 'El estado de la venta se ha actualizado correctamente'
       })
     } catch (error) {
