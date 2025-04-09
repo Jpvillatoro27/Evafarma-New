@@ -83,7 +83,7 @@ export default function CatalogoPage() {
       }
 
       const nuevoProducto = {
-        producto_id: productoSeleccionado.id,
+        producto_id: productoSeleccionado.id.toString(),
         principio_activo: nuevoProductoCatalogo.principio_activo,
         cantidad_capsulas: nuevoProductoCatalogo.tipo === 'capsulas' ? Number(nuevoProductoCatalogo.cantidad_capsulas) : null,
         peso: Number(nuevoProductoCatalogo.peso),

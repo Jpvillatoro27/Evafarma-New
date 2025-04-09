@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 
 export interface ProductoCatalogo {
   id: number
-  producto_id: number
+  producto_id: string
   principio_activo: string
   cantidad_capsulas: number | null
   peso: number
@@ -11,7 +11,7 @@ export interface ProductoCatalogo {
   created_at: string
   updated_at: string
   producto?: {
-    id: number
+    id: string
     nombre: string
     descripcion: string | null
     precio: number
@@ -40,7 +40,7 @@ export const catalogoService = {
   },
 
   async createProductoCatalogo(producto: {
-    producto_id: number
+    producto_id: string
     principio_activo: string
     cantidad_capsulas: number | null
     peso: number

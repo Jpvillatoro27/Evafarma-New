@@ -604,6 +604,8 @@ export const ventasService = {
 export const usuariosService = {
   async register(email: string, password: string, nombre: string) {
     try {
+      console.log('Iniciando registro para:', email)
+      
       // 1. Registrar en auth.users
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -618,59 +620,45 @@ export const usuariosService = {
 
       if (authError) {
         console.error('Error en auth.signUp:', authError)
-        throw new Error('Error al crear la cuenta de usuario')
+        throw new Error(`Error en autenticación: ${authError.message}`)
       }
 
       if (!authData?.user) {
-        throw new Error('No se pudo crear el usuario')
+        console.error('No se pudo crear el usuario en auth')
+        throw new Error('No se pudo crear el usuario en el sistema de autenticación')
       }
+
+      console.log('Usuario creado en auth:', authData.user.id)
 
       // 2. Crear en la tabla usuarios
-      try {
-        const { error: dbError } = await supabase
-          .from('usuarios')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            nombre: nombre,
-            rol: 'visitador',
-            created_at: new Date().toISOString()
-          })
+      const { error: dbError } = await supabase
+        .from('usuarios')
+        .insert({
+          id: authData.user.id,
+          email: email,
+          nombre: nombre,
+          rol: 'visitador',
+          created_at: new Date().toISOString()
+        })
 
-        if (dbError) {
-          console.error('Error al crear usuario en la base de datos:', dbError)
-          // Verificar si el error es de recursión de políticas
-          if (dbError.message.includes('infinite recursion')) {
-            // Si el error es de recursión pero el usuario se creó, continuamos
-            console.log('Usuario creado a pesar del error de recursión')
-            return authData
-          }
-          // Para otros tipos de errores, cerramos sesión
-          await supabase.auth.signOut()
-          throw new Error(`Error al crear el usuario en la base de datos: ${dbError.message}`)
-        }
-
-        return authData
-      } catch (dbError) {
-        // Verificar si el usuario realmente se creó a pesar del error
-        const { data: checkUser } = await supabase
-          .from('usuarios')
-          .select('*')
-          .eq('id', authData.user.id)
-          .single()
-
-        if (checkUser) {
-          console.log('Usuario encontrado después del error:', checkUser)
-          return authData
-        }
-
-        // Si no se encontró el usuario, cerramos sesión y lanzamos el error
+      if (dbError) {
+        console.error('Error al crear usuario en la base de datos:', dbError)
+        // Si hay error al crear en la base de datos, eliminamos el usuario de auth
         await supabase.auth.signOut()
-        throw dbError
+        throw new Error(`Error al crear el usuario en la base de datos: ${dbError.message}`)
+      }
+
+      console.log('Usuario creado exitosamente en la base de datos')
+      return {
+        success: true,
+        user: authData.user
       }
     } catch (error) {
-      console.error('Error en el registro:', error)
-      throw error
+      console.error('Error completo en el registro:', error)
+      if (error instanceof Error) {
+        throw new Error(`Error al registrar: ${error.message}`)
+      }
+      throw new Error('Error desconocido al registrar usuario')
     }
   },
 

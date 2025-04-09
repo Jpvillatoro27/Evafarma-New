@@ -29,10 +29,37 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterForm) => {
     try {
-      await usuariosService.register(data.email, data.password, data.nombre)
-      router.push('/login')
+      setError(null)
+      console.log('Intentando registrar usuario:', data.email)
+      
+      // Validar que todos los campos estén llenos
+      if (!data.email || !data.password || !data.nombre) {
+        setError('Todos los campos son requeridos')
+        return
+      }
+
+      // Validar longitud mínima de la contraseña
+      if (data.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres')
+        return
+      }
+
+      const result = await usuariosService.register(data.email, data.password, data.nombre)
+      console.log('Resultado del registro:', result)
+      
+      if (result) {
+        console.log('Registro exitoso, redirigiendo a login')
+        router.push('/login')
+      } else {
+        setError('No se pudo completar el registro')
+      }
     } catch (error) {
-      setError('Error al registrar usuario. Por favor, intenta nuevamente.')
+      console.error('Error en el registro:', error)
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('Error al registrar usuario. Por favor, intenta nuevamente.')
+      }
     }
   }
 
@@ -44,9 +71,14 @@ export default function RegisterPage() {
             Crear una cuenta
           </h2>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-8 space-y-6" onSubmit={(e) => {
+          e.preventDefault()
+          handleSubmit(onSubmit)(e)
+        }}>
           {error && (
-            <div className="text-red-600 text-center">{error}</div>
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{error}</span>
+            </div>
           )}
           <div className="rounded-md shadow-sm space-y-4">
             <div>

@@ -103,15 +103,18 @@ export default function LoginPage() {
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
           </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              ¿No tienes una cuenta?{' '}
+              <a
+                href="/register"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Regístrate aquí
+              </a>
+            </p>
+          </div>
         </form>
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            ¿No tienes una cuenta?{' '}
-            <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Regístrate
-            </a>
-          </p>
-        </div>
       </div>
     </div>
   )
