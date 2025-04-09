@@ -5,7 +5,8 @@ import { ventasService, usuariosService, cobrosService } from '@/lib/services'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface VentaMensual {
-  mes: string
+  mes: number
+  año: number
   total: number
   cantidad: number
   promedio: number
@@ -73,17 +74,22 @@ export default function VentasMensualesPage() {
       
       // Procesar ventas por mes
       const ventasPorMes = ventas.reduce((acc: { [key: string]: VentaMensual }, venta) => {
-        const mes = new Date(venta.fecha).toISOString().slice(0, 7) // Formato YYYY-MM
-        if (!acc[mes]) {
-          acc[mes] = {
+        const fecha = new Date(venta.fecha)
+        const mes = fecha.getMonth() + 1
+        const año = fecha.getFullYear()
+        const key = `${año}-${mes}`
+        
+        if (!acc[key]) {
+          acc[key] = {
             mes,
+            año,
             total: 0,
             cantidad: 0,
             promedio: 0
           }
         }
-        acc[mes].total += venta.total
-        acc[mes].cantidad += 1
+        acc[key].total += venta.total
+        acc[key].cantidad += 1
         return acc
       }, {})
 
@@ -94,7 +100,10 @@ export default function VentasMensualesPage() {
 
       // Convertir a array y ordenar por mes
       const ventasMensualesArray = Object.values(ventasPorMes)
-        .sort((a, b) => b.mes.localeCompare(a.mes))
+        .sort((a, b) => {
+          if (a.año !== b.año) return b.año - a.año
+          return b.mes - a.mes
+        })
 
       setVentasMensuales(ventasMensualesArray)
 
@@ -120,8 +129,15 @@ export default function VentasMensualesPage() {
           const ventaMensual = acc.find(v => v.mes === mes && v.año === año)
           if (ventaMensual) {
             ventaMensual.total += venta.total
+            ventaMensual.cantidad += 1
           } else {
-            acc.push({ mes, año, total: venta.total })
+            acc.push({ 
+              mes, 
+              año, 
+              total: venta.total,
+              cantidad: 1,
+              promedio: venta.total
+            })
           }
           
           return acc
@@ -245,9 +261,9 @@ export default function VentasMensualesPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {ventasMensuales.map((venta) => (
-                <tr key={venta.mes}>
+                <tr key={`${venta.año}-${venta.mes}`}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {formatDate(new Date(venta.mes))}
+                    {`${getNombreMes(venta.mes)} ${venta.año}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {formatCurrency(venta.total)}
