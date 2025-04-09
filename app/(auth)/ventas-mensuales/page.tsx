@@ -2,14 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { ventasService, usuariosService, cobrosService } from '@/lib/services'
-import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface VentaMensual {
   mes: number
   año: number
   total: number
-  cantidad: number
-  promedio: number
 }
 
 interface CobroMensual {
@@ -33,7 +30,6 @@ interface Usuario {
 }
 
 export default function VentasMensualesPage() {
-  const [ventasMensuales, setVentasMensuales] = useState<VentaMensual[]>([])
   const [visitadores, setVisitadores] = useState<Visitador[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,41 +68,6 @@ export default function VentasMensualesPage() {
       
       console.log('Visitadores filtrados:', visitadoresFiltrados)
       
-      // Procesar ventas por mes
-      const ventasPorMes = ventas.reduce((acc: { [key: string]: VentaMensual }, venta) => {
-        const fecha = new Date(venta.fecha)
-        const mes = fecha.getMonth() + 1
-        const año = fecha.getFullYear()
-        const key = `${año}-${mes}`
-        
-        if (!acc[key]) {
-          acc[key] = {
-            mes,
-            año,
-            total: 0,
-            cantidad: 0,
-            promedio: 0
-          }
-        }
-        acc[key].total += venta.total
-        acc[key].cantidad += 1
-        return acc
-      }, {})
-
-      // Calcular promedios
-      Object.values(ventasPorMes).forEach(venta => {
-        venta.promedio = venta.total / venta.cantidad
-      })
-
-      // Convertir a array y ordenar por mes
-      const ventasMensualesArray = Object.values(ventasPorMes)
-        .sort((a, b) => {
-          if (a.año !== b.año) return b.año - a.año
-          return b.mes - a.mes
-        })
-
-      setVentasMensuales(ventasMensualesArray)
-
       // Procesar las ventas y cobros por visitador
       const visitadoresData = visitadoresFiltrados.map(visitador => {
         // Filtrar ventas del visitador
@@ -121,7 +82,7 @@ export default function VentasMensualesPage() {
         console.log(`Cobros para visitador ${visitador.nombre}:`, cobrosVisitador)
         
         // Agrupar ventas por mes
-        const ventasPorMesVisitador = ventasVisitador.reduce((acc: VentaMensual[], venta) => {
+        const ventasPorMes = ventasVisitador.reduce((acc: VentaMensual[], venta) => {
           const fecha = new Date(venta.fecha)
           const mes = fecha.getMonth() + 1
           const año = fecha.getFullYear()
@@ -129,15 +90,8 @@ export default function VentasMensualesPage() {
           const ventaMensual = acc.find(v => v.mes === mes && v.año === año)
           if (ventaMensual) {
             ventaMensual.total += venta.total
-            ventaMensual.cantidad += 1
           } else {
-            acc.push({ 
-              mes, 
-              año, 
-              total: venta.total,
-              cantidad: 1,
-              promedio: venta.total
-            })
+            acc.push({ mes, año, total: venta.total })
           }
           
           return acc
@@ -162,7 +116,7 @@ export default function VentasMensualesPage() {
         return {
           id: visitador.id,
           nombre: visitador.nombre,
-          ventas: ventasPorMesVisitador.sort((a, b) => {
+          ventas: ventasPorMes.sort((a, b) => {
             if (a.año !== b.año) return b.año - a.año
             return b.mes - a.mes
           }),
@@ -213,73 +167,74 @@ export default function VentasMensualesPage() {
     return <div className="text-red-600">{error}</div>
   }
   
-  // Calcular totales
-  const totalVentas = ventasMensuales.reduce((sum, venta) => sum + venta.total, 0)
-  const ventasPromedio = ventasMensuales.length > 0 
-    ? totalVentas / ventasMensuales.length 
-    : 0
-  const ventasMesActual = ventasMensuales[0]?.total || 0
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Ventas Mensuales</h1>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">
+        {usuario?.rol === 'admin' ? 'Ventas Mensuales por Visitador' : 'Mis Ventas Mensuales'}
+      </h1>
+      
+      {visitadores.map(visitador => {
+        const totales = calcularTotales(visitador)
+        return (
+          <div key={visitador.id} className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">{visitador.nombre}</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse table-auto text-sm">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-4 py-2 text-left">Mes</th>
+                    <th className="px-4 py-2 text-left">Año</th>
+                    <th className="px-4 py-2 text-right">Ventas</th>
+                    <th className="px-4 py-2 text-right">Cobros</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitador.ventas.length > 0 || visitador.cobros.length > 0 ? (
+                    [...new Set([
+                      ...visitador.ventas.map(v => `${v.año}-${v.mes}`),
+                      ...visitador.cobros.map(c => `${c.año}-${c.mes}`)
+                    ])].sort().reverse().map(mesKey => {
+                      const [año, mes] = mesKey.split('-').map(Number)
+                      const venta = visitador.ventas.find(v => v.mes === mes && v.año === año)
+                      const cobro = visitador.cobros.find(c => c.mes === mes && c.año === año)
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Total Ventas</h3>
-          <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(totalVentas)}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Ventas Promedio</h3>
-          <p className="text-2xl font-bold text-blue-600">
-            {formatCurrency(ventasPromedio)}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Ventas del Mes</h3>
-          <p className="text-2xl font-bold text-purple-600">
-            {formatCurrency(ventasMesActual)}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold">Resumen Mensual</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ventas</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad de Ventas</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Promedio por Venta</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {ventasMensuales.map((venta) => (
-                <tr key={`${venta.año}-${venta.mes}`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {`${getNombreMes(venta.mes)} ${venta.año}`}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {formatCurrency(venta.total)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {venta.cantidad}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {formatCurrency(venta.promedio)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      return (
+                        <tr key={mesKey} className="border-b hover:bg-gray-50">
+                          <td className="px-4 py-2">{getNombreMes(mes)}</td>
+                          <td className="px-4 py-2">{año}</td>
+                          <td className="px-4 py-2 text-right">
+                            Q{(venta?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            Q{(cobro?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
+                        No hay datos registrados
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-100 font-semibold">
+                    <td colSpan={2} className="px-4 py-2 text-right">Totales:</td>
+                    <td className="px-4 py-2 text-right">
+                      Q{totales.totalVentas.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      Q{totales.totalCobros.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 } 

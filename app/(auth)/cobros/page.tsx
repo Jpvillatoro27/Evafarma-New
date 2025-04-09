@@ -367,115 +367,116 @@ export default function CobrosPage() {
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Cobros</h1>
-        <div className="flex gap-4">
-          <Input
-            type="text"
-            placeholder="Buscar cobros..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
-          />
-          {user?.rol === 'admin' && (
-            <Select value={filtroVisitador} onValueChange={setFiltroVisitador}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por visitador" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los visitadores</SelectItem>
-                {visitadores.map(visitador => (
-                  <SelectItem key={visitador.id} value={visitador.id}>
-                    {visitador.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>Nuevo Cobro</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Nuevo Cobro</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="numero">Número de Cobro</Label>
-                    <Input
-                      id="numero"
-                      value={formData.numero}
-                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fecha">Fecha</Label>
-                    <Input
-                      id="fecha"
-                      type="date"
-                      value={formData.fecha}
-                      onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
+        <Button onClick={() => setIsDialogOpen(true)}>Nuevo Cobro</Button>
+      </div>
 
-                <div>
-                  <Label htmlFor="cliente">Cliente</Label>
-                  <Select
-                    value={formData.cliente_id}
-                    onValueChange={handleClienteChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientes.map(cliente => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nombre} ({cliente.codigo})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Nuevo Cobro</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="numero">Número de Cobro</Label>
+                <Input
+                  id="numero"
+                  value={formData.numero}
+                  onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="fecha">Fecha</Label>
+                <Input
+                  id="fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
 
-                <div>
-                  <Label htmlFor="descripcion">Descripción</Label>
-                  <Input
-                    id="descripcion"
-                    value={formData.descripcion}
-                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  />
-                </div>
+            <div>
+              <Label htmlFor="cliente">Cliente</Label>
+              <Select
+                value={formData.cliente_id}
+                onValueChange={handleClienteChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map(cliente => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nombre} ({cliente.codigo})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                <div>
-                  <Label htmlFor="total">Total</Label>
-                  <Input
-                    id="total"
-                    type="number"
-                    value={formData.total}
-                    onChange={(e) => setFormData({ ...formData, total: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
+            <div>
+              <Label htmlFor="descripcion">Descripción</Label>
+              <Input
+                id="descripcion"
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              />
+            </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit">
-                    Crear Cobro
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+            <div>
+              <Label htmlFor="total">Total</Label>
+              <Input
+                id="total"
+                type="number"
+                value={formData.total}
+                onChange={(e) => setFormData({ ...formData, total: parseFloat(e.target.value) || 0 })}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Crear Cobro
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex gap-4 mb-6">
+        <Input
+          placeholder="Buscar en cobros..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+        
+        <Select
+          value={filtroVisitador}
+          onValueChange={setFiltroVisitador}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filtrar por visitador" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los visitadores</SelectItem>
+            {visitadores.map(visitador => (
+              <SelectItem key={visitador.id} value={visitador.id}>
+                {visitador.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
@@ -483,51 +484,59 @@ export default function CobrosPage() {
       ) : error ? (
         <div className="text-red-500">{error}</div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                {user?.rol === 'admin' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                )}
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 text-left">Número</th>
+                <th className="px-4 py-2 text-left">Fecha</th>
+                <th className="px-4 py-2 text-left">Cliente</th>
+                <th className="px-4 py-2 text-left">Visitador</th>
+                <th className="px-4 py-2 text-left">Descripción</th>
+                <th className="px-4 py-2 text-right">Total</th>
+                <th className="px-4 py-2 text-left">Estado</th>
+                <th className="px-4 py-2 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {cobrosFiltrados.map((cobro) => (
-                <tr key={cobro.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{cobro.numero}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {format(new Date(cobro.fecha), 'PPP', { locale: es })}
+                <tr key={cobro.id} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-2">{cobro.numero}</td>
+                  <td className="px-4 py-2">
+                    {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{cobro.clientes.nombre}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{cobro.descripcion}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Q {cobro.total.toLocaleString('es-GT')}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      cobro.Estado === 'confirmado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  <td className="px-4 py-2">
+                    {cobro.clientes?.nombre} ({cobro.cod_farmacia})
+                  </td>
+                  <td className="px-4 py-2">
+                    {visitadores.find(v => v.id === cobro.visitador)?.nombre || cobro.visitador}
+                  </td>
+                  <td className="px-4 py-2">{cobro.descripcion || '-'}</td>
+                  <td className="px-4 py-2 text-right">
+                    Q{cobro.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      cobro.Estado === 'Confirmado' 
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Pendiente'}
+                      {cobro.Estado}
                     </span>
                   </td>
-                  {user?.rol === 'admin' && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {cobro.Estado !== 'confirmado' && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          <CheckCircleIcon className="h-5 w-5" />
-                        </Button>
-                      )}
-                    </td>
-                  )}
+                  <td className="px-4 py-2 text-center">
+                    {cobro.Estado === 'Pendiente' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
+                        title="Confirmar cobro"
+                        className="hover:bg-gray-100"
+                      >
+                        <CheckCircleIcon className="h-5 w-5" />
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
