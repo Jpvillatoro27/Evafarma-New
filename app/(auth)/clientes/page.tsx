@@ -361,7 +361,6 @@ export default function ClientesPage() {
                 <th className="px-4 py-2 text-left">Departamento</th>
                 <th className="px-4 py-2 text-right">Saldo Pendiente</th>
                 <th className="px-4 py-2 text-left">Visitador</th>
-                <th className="px-4 py-2 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -379,11 +378,6 @@ export default function ClientesPage() {
                   </td>
                   <td className="px-4 py-2">
                     {visitadores.find(v => v.id === cliente.visitador)?.nombre || '-'}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={`/clientes/${cliente.id}/cobro`}>Ver Cobros</a>
-                    </Button>
                   </td>
                 </tr>
               ))}
