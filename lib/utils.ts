@@ -7,11 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined) return '-'
-  return `Q${value.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`
-}
-
-export const formatCurrency = (amount: number): string => {
-  return `Q ${amount.toLocaleString('es-GT', {
+  return `Q ${value.toLocaleString('es-GT', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`
