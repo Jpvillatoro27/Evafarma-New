@@ -25,10 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    let mounted = true
+
     const checkUser = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
+        if (session?.user && mounted) {
           const { data: userData, error } = await supabase
             .from('usuarios')
             .select('*')
@@ -37,22 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (error) throw error
 
-          setUser({
-            id: userData.id,
-            email: userData.email,
-            rol: userData.rol
-          })
+          if (mounted) {
+            setUser({
+              id: userData.id,
+              email: userData.email,
+              rol: userData.rol
+            })
+          }
         }
       } catch (error) {
         console.error('Error al verificar sesión:', error)
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     checkUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
       if (session?.user) {
         const { data: userData, error } = await supabase
           .from('usuarios')
@@ -73,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])

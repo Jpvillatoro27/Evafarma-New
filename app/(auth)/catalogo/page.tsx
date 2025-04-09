@@ -37,31 +37,25 @@ export default function CatalogoPage() {
   const router = useRouter()
 
   useEffect(() => {
-    loadProductos()
-    loadCatalogo()
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const [productosData, catalogoData] = await Promise.all([
+          productosService.getProductos(),
+          catalogoService.getCatalogo()
+        ])
+        setProductos(productosData)
+        setCatalogo(catalogoData)
+      } catch (error) {
+        console.error('Error al cargar datos:', error)
+        toast.error('Error al cargar los datos')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
   }, [])
-
-  const loadProductos = async () => {
-    try {
-      const data = await productosService.getProductos()
-      setProductos(data)
-    } catch (error) {
-      console.error('Error al cargar productos:', error)
-      toast.error('Error al cargar los productos')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadCatalogo = async () => {
-    try {
-      const data = await catalogoService.getCatalogo()
-      setCatalogo(data)
-    } catch (error) {
-      console.error('Error al cargar catálogo:', error)
-      toast.error('Error al cargar el catálogo')
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +65,7 @@ export default function CatalogoPage() {
     }
 
     try {
+      setLoading(true)
       let imagenUrl = ''
       if (imagen) {
         try {
@@ -91,18 +86,19 @@ export default function CatalogoPage() {
         imagen_url: imagenUrl
       }
 
-      console.log('Creando producto:', nuevoProducto)
-
-      const resultado = await catalogoService.createProductoCatalogo(nuevoProducto)
-      console.log('Resultado:', resultado)
-
+      await catalogoService.createProductoCatalogo(nuevoProducto)
       toast.success('Producto agregado al catálogo exitosamente')
       setShowDialog(false)
       resetForm()
-      loadCatalogo()
+      
+      // Actualizar el catálogo localmente
+      const updatedCatalogo = await catalogoService.getCatalogo()
+      setCatalogo(updatedCatalogo)
     } catch (error) {
       console.error('Error al crear producto:', error)
       toast.error('Error al crear el producto en el catálogo')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -124,22 +120,21 @@ export default function CatalogoPage() {
     }
 
     try {
-      console.log('Intentando eliminar producto:', id)
+      setLoading(true)
       const { error } = await supabase
         .from('catalogo')
         .delete()
         .eq('id', id)
 
-      if (error) {
-        throw error
-      }
+      if (error) throw error
 
-      console.log('Producto eliminado exitosamente')
       setCatalogo(prevCatalogo => prevCatalogo.filter(item => item.id !== id))
       toast.success('Producto eliminado del catálogo')
     } catch (error) {
       console.error('Error al eliminar producto:', error)
       toast.error('Error al eliminar el producto del catálogo')
+    } finally {
+      setLoading(false)
     }
   }
 
