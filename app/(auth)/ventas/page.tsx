@@ -372,6 +372,7 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
+      // Actualizar el estado en la base de datos
       const { error } = await supabase
         .from('ventas_mensuales')
         .update({ estado: estadoSeleccionado })
@@ -379,17 +380,47 @@ export default function VentasPage() {
 
       if (error) throw error
 
-      // Actualizar el estado local
-      setVentas(ventas.map(v => 
-        v.id === ventaSeleccionada.id 
-          ? { ...v, estado: estadoSeleccionado } 
-          : v
-      ))
+      // Si el estado es "anulado", restar el total del saldo pendiente del cliente
+      if (estadoSeleccionado === 'anulado') {
+        const nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
+        
+        // Actualizar el saldo del cliente
+        const { error: saldoError } = await supabase
+          .from('clientes')
+          .update({ saldo_pendiente: nuevoSaldo })
+          .eq('id', ventaSeleccionada.cliente_id)
+
+        if (saldoError) throw saldoError
+
+        // Actualizar el saldo en la interfaz
+        setVentas(ventas.map(v => {
+          if (v.id === ventaSeleccionada.id) {
+            return {
+              ...v,
+              estado: estadoSeleccionado,
+              clientes: {
+                ...v.clientes,
+                saldo_pendiente: nuevoSaldo
+              }
+            }
+          }
+          return v
+        }))
+      } else {
+        // Actualizar solo el estado si no es "anulado"
+        setVentas(ventas.map(v => 
+          v.id === ventaSeleccionada.id 
+            ? { ...v, estado: estadoSeleccionado } 
+            : v
+        ))
+      }
 
       setIsEstadoDialogOpen(false)
       toast({
         title: 'Estado actualizado',
-        description: 'El estado de la venta se ha actualizado correctamente'
+        description: estadoSeleccionado === 'anulado' 
+          ? 'La venta ha sido anulada y el saldo del cliente ha sido actualizado'
+          : 'El estado de la venta se ha actualizado correctamente'
       })
     } catch (error) {
       console.error('Error al actualizar estado:', error)
