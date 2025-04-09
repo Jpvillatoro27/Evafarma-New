@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Producto } from '@/types'
 import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { es } from 'date-fns/locale'
 
 interface ProductoVenta {
   id: string
@@ -145,7 +147,14 @@ export default function VentasPage() {
   const loadClientes = async () => {
     try {
       const data = await clientesService.getClientes()
-      setClientes(data)
+      const usuario = await usuariosService.getUsuarioActual()
+      
+      // Filtrar los clientes según el rol del usuario
+      const clientesFiltrados = usuario?.rol === 'admin'
+        ? data
+        : data.filter(cliente => cliente.visitador === usuario?.id)
+      
+      setClientes(clientesFiltrados)
     } catch (error) {
       console.error('Error al cargar clientes:', error)
       toast({
@@ -489,259 +498,83 @@ export default function VentasPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Ventas</h1>
-        <Dialog 
-          open={isDialogOpen} 
-          onOpenChange={setIsDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>Nueva Venta</Button>
-          </DialogTrigger>
-          <DialogContent 
-            className="max-w-4xl"
-            onPointerDownOutside={(e) => {
-              // Prevenir que el diálogo se cierre al hacer clic fuera
-              e.preventDefault()
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Crear Nueva Venta</DialogTitle>
-              <DialogDescription>
-                Complete el formulario para registrar una nueva venta. Seleccione el cliente, la fecha y los productos a vender.
-              </DialogDescription>
-            </DialogHeader>
-            <form 
-              onSubmit={handleSubmit} 
-              className="space-y-4"
-              onFocus={(e) => {
-                // Asegurar que el foco se mantenga dentro del formulario
-                const target = e.target as HTMLElement
-                if (!target.closest('.dialog-content')) {
-                  e.preventDefault()
-                }
-              }}
-            >
-              <div className="dialog-content">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cliente">Cliente</Label>
-                    <Select 
-                      value={formData.cliente_id} 
-                      onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clientes.map((cliente) => (
-                          <SelectItem key={cliente.id} value={cliente.id}>
-                            {cliente.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="fecha">Fecha</Label>
-                    <Input
-                      id="fecha"
-                      type="date"
-                      value={formData.fecha}
-                      onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Productos</h3>
-                    <Button type="button" onClick={agregarProducto} variant="outline" size="sm">
-                      Agregar Producto
-                    </Button>
-                  </div>
-                  
-                  {formData.productos.map((producto, index) => (
-                    <div key={index} className="grid grid-cols-6 gap-4">
-                      <div className="col-span-2">
-                        <Label>Producto</Label>
-                        <Select
-                          value={producto.id}
-                          onValueChange={(value) => actualizarProducto(index, 'id', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar producto">
-                              {producto.id ? `${producto.nombre} - Stock: ${producto.stock_disponible}` : 'Seleccionar producto'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {productos.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.nombre} - Stock: {p.stock}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Precio Unitario</Label>
-                        <Input
-                          type="number"
-                          value={producto.precio_unitario}
-                          onChange={(e) => actualizarProducto(index, 'precio_unitario', e.target.value)}
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <Label>Cantidad</Label>
-                        <Input
-                          type="number"
-                          value={producto.cantidad}
-                          onChange={(e) => {
-                            const cantidad = Number(e.target.value)
-                            if (cantidad > producto.stock_disponible) {
-                              toast({
-                                title: 'Error',
-                                description: `La cantidad no puede ser mayor al stock disponible (${producto.stock_disponible})`,
-                                variant: 'destructive'
-                              })
-                              return
-                            }
-                            actualizarProducto(index, 'cantidad', cantidad)
-                          }}
-                          min="1"
-                          max={producto.stock_disponible}
-                        />
-                      </div>
-                      <div>
-                        <Label>Total</Label>
-                        <Input
-                          type="number"
-                          value={producto.total}
-                          readOnly
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          variant="outline"
-                          onClick={() => eliminarProducto(index)}
-                          className="w-full"
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-end items-center space-x-4">
-                    <Label>Total Venta:</Label>
-                    <div className="font-bold text-lg">
-                      Q{formData.total.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full">Crear Venta</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="mb-6 flex gap-4 items-center">
-        <Input
-          placeholder="Buscar en ventas..."
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Ventas</h1>
+      
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Buscar ventas..."
+          className="w-full px-4 py-2 border rounded-lg"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md"
         />
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Filtrar por estado:</span>
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="text-sm border rounded p-1.5 bg-white"
-          >
-            <option value="todos">Todos</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="enviado">Enviado</option>
-            <option value="completado">Completado</option>
-            <option value="anulado">Anulado</option>
-          </select>
-        </div>
       </div>
 
-      <div className="overflow-x-auto text-sm">
-        <table className="w-full border-collapse table-auto">
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="px-3 py-1.5 text-left">Código</th>
-              <th className="px-3 py-1.5 text-left">Cliente</th>
-              <th className="px-3 py-1.5 text-left">Fecha</th>
-              <th className="px-3 py-1.5 text-left">Visitador</th>
-              <th className="px-3 py-1.5 text-right">Total</th>
-              <th className="px-3 py-1.5 text-right">Saldo Pendiente</th>
-              <th className="px-3 py-1.5 text-left">Rastreo</th>
-              <th className="px-3 py-1.5 text-left">Estado</th>
-              <th className="px-3 py-1.5 text-left">Productos</th>
-              <th className="px-3 py-1.5 text-center">Acciones</th>
+            <tr>
+              <th className="px-6 py-3 border-b text-left">Fecha</th>
+              <th className="px-6 py-3 border-b text-left">Cliente</th>
+              <th className="px-6 py-3 border-b text-left">Total</th>
+              <th className="px-6 py-3 border-b text-left">Estado</th>
+              {user?.rol === 'admin' && (
+                <th className="px-6 py-3 border-b text-left">Acciones</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {ventasFiltradas.map((venta) => (
-              <tr key={venta.id} className="border-b hover:bg-gray-50">
-                <td className="px-3 py-1.5">{venta.codigo}</td>
-                <td className="px-3 py-1.5">{venta.clientes.nombre}</td>
-                <td className="px-3 py-1.5">
-                  {new Date(venta.fecha).toLocaleDateString()}
+              <tr key={venta.id}>
+                <td className="px-6 py-4 border-b">
+                  {formatDate(venta.fecha)}
                 </td>
-                <td className="px-3 py-1.5">
-                  {visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}
+                <td className="px-6 py-4 border-b">
+                  {venta.clientes.nombre}
                 </td>
-                <td className="px-3 py-1.5 text-right">
-                  Q{venta.total.toFixed(2)}
+                <td className="px-6 py-4 border-b">
+                  {formatCurrency(venta.total)}
                 </td>
-                <td className="px-3 py-1.5 text-right">
-                  Q{venta.clientes.saldo_pendiente.toFixed(2)}
-                </td>
-                <td className="px-3 py-1.5">
-                  {venta.rastreo || '-'}
-                </td>
-                <td className="px-3 py-1.5">
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${getEstadoColor(venta.estado)}`}>
-                    {venta.estado ? venta.estado.charAt(0).toUpperCase() + venta.estado.slice(1) : 'Sin Estado'}
+                <td className="px-6 py-4 border-b">
+                  <span className={`px-2 py-1 rounded-full text-sm ${
+                    venta.estado === 'completado' 
+                      ? 'bg-green-100 text-green-800'
+                      : venta.estado === 'enviado'
+                      ? 'bg-blue-100 text-blue-800'
+                      : venta.estado === 'anulado'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {venta.estado === 'completado' 
+                      ? 'Completado'
+                      : venta.estado === 'enviado'
+                      ? 'Enviado'
+                      : venta.estado === 'anulado'
+                      ? 'Anulado'
+                      : 'Pendiente'}
                   </span>
                 </td>
-                <td className="px-3 py-1.5">
-                  {venta.productos && venta.productos.length > 0 && (
-                    <ul className="list-disc list-inside text-xs">
-                      {venta.productos.map((producto, index) => (
-                        <li key={index}>
-                          {producto.nombre} - {producto.cantidad} x Q{producto.precio_unitario.toFixed(2)}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </td>
-                <td className="px-3 py-1.5 space-x-1">
-                  <button
-                    onClick={() => handleAgregarRastreo(venta)}
-                    className="p-1.5 text-blue-600 hover:text-blue-800 transition-colors"
-                    title="Agregar guía de rastreo"
-                  >
-                    <TruckIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleCambiarEstado(venta)}
-                    className="p-1.5 text-green-600 hover:text-green-800 transition-colors"
-                    title="Cambiar estado de la venta"
-                  >
-                    <CheckCircleIcon className="h-4 w-4" />
-                  </button>
-                </td>
+                {user?.rol === 'admin' && (
+                  <td className="px-6 py-4 border-b">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleAgregarRastreo(venta)}
+                        className="text-blue-600 hover:text-blue-800 mr-2"
+                      >
+                        <TruckIcon className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleCambiarEstado(venta)}
+                        className="text-yellow-600 hover:text-yellow-800"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

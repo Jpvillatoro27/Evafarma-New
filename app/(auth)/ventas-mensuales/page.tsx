@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ventasService, usuariosService, cobrosService } from '@/lib/services'
+import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface VentaMensual {
   mes: number
@@ -168,73 +169,65 @@ export default function VentasMensualesPage() {
   }
   
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">
-        {usuario?.rol === 'admin' ? 'Ventas Mensuales por Visitador' : 'Mis Ventas Mensuales'}
-      </h1>
-      
-      {visitadores.map(visitador => {
-        const totales = calcularTotales(visitador)
-        return (
-          <div key={visitador.id} className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">{visitador.nombre}</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse table-auto text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-4 py-2 text-left">Mes</th>
-                    <th className="px-4 py-2 text-left">Año</th>
-                    <th className="px-4 py-2 text-right">Ventas</th>
-                    <th className="px-4 py-2 text-right">Cobros</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visitador.ventas.length > 0 || visitador.cobros.length > 0 ? (
-                    [...new Set([
-                      ...visitador.ventas.map(v => `${v.año}-${v.mes}`),
-                      ...visitador.cobros.map(c => `${c.año}-${c.mes}`)
-                    ])].sort().reverse().map(mesKey => {
-                      const [año, mes] = mesKey.split('-').map(Number)
-                      const venta = visitador.ventas.find(v => v.mes === mes && v.año === año)
-                      const cobro = visitador.cobros.find(c => c.mes === mes && c.año === año)
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Ventas Mensuales</h1>
 
-                      return (
-                        <tr key={mesKey} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-2">{getNombreMes(mes)}</td>
-                          <td className="px-4 py-2">{año}</td>
-                          <td className="px-4 py-2 text-right">
-                            Q{(venta?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            Q{(cobro?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
-                        No hay datos registrados
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-100 font-semibold">
-                    <td colSpan={2} className="px-4 py-2 text-right">Totales:</td>
-                    <td className="px-4 py-2 text-right">
-                      Q{totales.totalVentas.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      Q{totales.totalCobros.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )
-      })}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Total Ventas</h3>
+          <p className="text-2xl font-bold text-green-600">
+            {formatCurrency(totalVentas)}
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Ventas Promedio</h3>
+          <p className="text-2xl font-bold text-blue-600">
+            {formatCurrency(ventasPromedio)}
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Ventas del Mes</h3>
+          <p className="text-2xl font-bold text-purple-600">
+            {formatCurrency(ventasMesActual)}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold">Resumen Mensual</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ventas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad de Ventas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Promedio por Venta</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {ventasMensuales.map((venta) => (
+                <tr key={venta.mes}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {formatDate(new Date(venta.mes))}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {formatCurrency(venta.total)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {venta.cantidad}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {formatCurrency(venta.promedio)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 } 
