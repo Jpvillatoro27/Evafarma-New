@@ -188,11 +188,13 @@ export default function VentasPage() {
       if (productoSeleccionado) {
         producto.id = valor as string
         producto.nombre = productoSeleccionado.nombre
-        producto.precio_unitario = productoSeleccionado.precio_venta
         producto.stock_disponible = productoSeleccionado.stock
+        // No establecemos el precio_unitario aquí, se establecerá manualmente
       }
     } else if (campo === 'cantidad') {
       producto.cantidad = Number(valor)
+    } else if (campo === 'precio_unitario') {
+      producto.precio_unitario = Number(valor)
     }
 
     producto.total = producto.cantidad * producto.precio_unitario
@@ -533,8 +535,8 @@ export default function VentasPage() {
                   </div>
                   
                   {formData.productos.map((producto, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-4 items-end border p-4 rounded-lg">
-                      <div className="col-span-4">
+                    <div key={index} className="grid grid-cols-6 gap-4">
+                      <div className="col-span-2">
                         <Label>Producto</Label>
                         <Select
                           value={producto.id}
@@ -554,42 +556,50 @@ export default function VentasPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="col-span-2">
-                        <Label>Cantidad</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={producto.cantidad}
-                          onChange={(e) => actualizarProducto(index, 'cantidad', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <Label>Precio Unit.</Label>
+                      <div>
+                        <Label>Precio Unitario</Label>
                         <Input
                           type="number"
                           value={producto.precio_unitario}
-                          readOnly
-                          disabled
+                          onChange={(e) => actualizarProducto(index, 'precio_unitario', e.target.value)}
+                          min="0"
+                          step="0.01"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div>
+                        <Label>Cantidad</Label>
+                        <Input
+                          type="number"
+                          value={producto.cantidad}
+                          onChange={(e) => {
+                            const cantidad = Number(e.target.value)
+                            if (cantidad > producto.stock_disponible) {
+                              toast({
+                                title: 'Error',
+                                description: `La cantidad no puede ser mayor al stock disponible (${producto.stock_disponible})`,
+                                variant: 'destructive'
+                              })
+                              return
+                            }
+                            actualizarProducto(index, 'cantidad', cantidad)
+                          }}
+                          min="1"
+                          max={producto.stock_disponible}
+                        />
+                      </div>
+                      <div>
                         <Label>Total</Label>
                         <Input
                           type="number"
                           value={producto.total}
                           readOnly
-                          disabled
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="flex items-end">
                         <Button
-                          type="button"
+                          variant="outline"
                           onClick={() => eliminarProducto(index)}
-                          variant="destructive"
-                          size="sm"
                           className="w-full"
-                          disabled={formData.productos.length === 1}
                         >
                           Eliminar
                         </Button>
