@@ -145,7 +145,14 @@ export default function VentasPage() {
   const loadClientes = async () => {
     try {
       const data = await clientesService.getClientes()
-      setClientes(data)
+      const usuario = await usuariosService.getUsuarioActual()
+      
+      // Filtrar los clientes según el rol del usuario
+      const clientesFiltrados = usuario?.rol === 'admin'
+        ? data
+        : data.filter(cliente => cliente.visitador === usuario?.id)
+      
+      setClientes(clientesFiltrados)
     } catch (error) {
       console.error('Error al cargar clientes:', error)
       toast({
