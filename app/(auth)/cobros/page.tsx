@@ -312,17 +312,26 @@ export default function CobrosPage() {
 
     try {
       // Confirmar el cobro
-      await cobrosService.confirmarCobro(cobroId)
+      const cobroActualizado = await cobrosService.confirmarCobro(cobroId)
       
       // Actualizar el saldo pendiente del cliente
       await clientesService.actualizarSaldo(clienteId, -total)
+      
+      // Actualizar el estado en la interfaz inmediatamente
+      setCobros(prevCobros => 
+        prevCobros.map(cobro => 
+          cobro.id === cobroId 
+            ? { ...cobro, Estado: 'Confirmado' } 
+            : cobro
+        )
+      )
       
       toast({
         title: 'Cobro confirmado',
         description: 'El cobro ha sido confirmado y el saldo actualizado',
       })
       
-      // Recargar los cobros para actualizar la vista
+      // Recargar los cobros para asegurar que todo esté sincronizado
       loadCobros()
     } catch (error) {
       console.error('Error al confirmar cobro:', error)
@@ -518,20 +527,20 @@ export default function CobrosPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      cobro.Estado === 'confirmado'
+                      cobro.Estado === 'Confirmado'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {cobro.Estado === 'confirmado' ? 'Confirmado' : 'Pendiente'}
+                      {cobro.Estado === 'Confirmado' ? 'Confirmado' : 'Pendiente'}
                     </span>
                   </td>
                   {user?.rol === 'admin' && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
                         onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                        disabled={cobro.Estado === 'confirmado'}
+                        disabled={cobro.Estado === 'Confirmado'}
                         className="text-indigo-600 hover:text-indigo-900"
-                        title={cobro.Estado === 'confirmado' ? 'Cobro ya confirmado' : 'Confirmar cobro'}
+                        title={cobro.Estado === 'Confirmado' ? 'Cobro ya confirmado' : 'Confirmar cobro'}
                       >
                         <CheckCircleIcon className="h-5 w-5" />
                       </button>
