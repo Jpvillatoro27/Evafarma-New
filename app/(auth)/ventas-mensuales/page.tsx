@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react'
 import { ventasService, usuariosService, cobrosService } from '@/lib/services'
 
-interface VentaMensual {
-  mes: number
+interface VentaSemanal {
+  semana: number
   año: number
   total: number
+  meta: number
+  porcentaje: number
 }
 
-interface CobroMensual {
-  mes: number
+interface CobroSemanal {
+  semana: number
   año: number
   total: number
 }
@@ -18,8 +20,8 @@ interface CobroMensual {
 interface Visitador {
   id: string
   nombre: string
-  ventas: VentaMensual[]
-  cobros: CobroMensual[]
+  ventas: VentaSemanal[]
+  cobros: CobroSemanal[]
 }
 
 interface Usuario {
@@ -38,7 +40,6 @@ export default function VentasMensualesPage() {
   const loadVentasMensuales = async () => {
     try {
       setLoading(true)
-      // Obtener el usuario actual
       const usuarioActual = await usuariosService.getUsuarioActual()
       if (usuarioActual) {
         setUsuario({
@@ -48,90 +49,76 @@ export default function VentasMensualesPage() {
           rol: usuarioActual.rol as 'admin' | 'visitador'
         })
       }
-      console.log('Usuario actual:', usuarioActual)
       
-      // Obtener todos los visitadores
       const usuarios = await usuariosService.getVisitadores()
-      console.log('Visitadores obtenidos:', usuarios)
-      
       const ventas = await ventasService.getVentas()
-      console.log('Ventas obtenidas:', ventas)
-      
       const cobros = await cobrosService.getCobros()
-      console.log('Cobros obtenidos:', cobros)
-      console.log('Estados de cobros:', cobros.map(c => ({ id: c.id, estado: c.Estado })))
       
-      // Filtrar visitadores según el rol del usuario
-      const visitadoresFiltrados = usuarioActual.rol === 'admin'
+      const visitadoresFiltrados = usuarioActual?.rol === 'admin'
         ? usuarios
-        : usuarios.filter(visitador => visitador.id === usuarioActual.id)
+        : usuarios.filter(visitador => visitador.id === usuarioActual?.id)
       
-      console.log('Visitadores filtrados:', visitadoresFiltrados)
-      
-      // Procesar las ventas y cobros por visitador
       const visitadoresData = visitadoresFiltrados.map(visitador => {
-        // Filtrar ventas del visitador
         const ventasVisitador = ventas.filter(venta => venta.visitador === visitador.id)
-        console.log(`Ventas para visitador ${visitador.nombre}:`, ventasVisitador)
-        
-        // Filtrar cobros confirmados del visitador
         const cobrosVisitador = cobros.filter(cobro => 
           cobro.visitador === visitador.id && 
           cobro.Estado?.toUpperCase() === 'CONFIRMADO'
         )
-        console.log(`Cobros para visitador ${visitador.nombre}:`, cobrosVisitador)
         
-        // Agrupar ventas por mes
-        const ventasPorMes = ventasVisitador.reduce((acc: VentaMensual[], venta) => {
+        const ventasPorSemana = ventasVisitador.reduce((acc: VentaSemanal[], venta) => {
           const fecha = new Date(venta.fecha)
-          const mes = fecha.getMonth() + 1
+          const semana = getSemanaDelAño(fecha)
           const año = fecha.getFullYear()
+          const meta = 20000
           
-          const ventaMensual = acc.find(v => v.mes === mes && v.año === año)
-          if (ventaMensual) {
-            ventaMensual.total += venta.total
+          const ventaSemanal = acc.find(v => v.semana === semana && v.año === año)
+          if (ventaSemanal) {
+            ventaSemanal.total += venta.total
+            ventaSemanal.porcentaje = (ventaSemanal.total / meta) * 100
           } else {
-            acc.push({ mes, año, total: venta.total })
+            acc.push({ 
+              semana, 
+              año, 
+              total: venta.total,
+              meta,
+              porcentaje: (venta.total / meta) * 100
+            })
           }
-          
           return acc
         }, [])
         
-        // Agrupar cobros por mes
-        const cobrosPorMes = cobrosVisitador.reduce((acc: CobroMensual[], cobro) => {
+        const cobrosPorSemana = cobrosVisitador.reduce((acc: CobroSemanal[], cobro) => {
           const fecha = new Date(cobro.fecha)
-          const mes = fecha.getMonth() + 1
+          const semana = getSemanaDelAño(fecha)
           const año = fecha.getFullYear()
           
-          const cobroMensual = acc.find(c => c.mes === mes && c.año === año)
-          if (cobroMensual) {
-            cobroMensual.total += cobro.total
+          const cobroSemanal = acc.find(c => c.semana === semana && c.año === año)
+          if (cobroSemanal) {
+            cobroSemanal.total += cobro.total
           } else {
-            acc.push({ mes, año, total: cobro.total })
+            acc.push({ semana, año, total: cobro.total })
           }
-          
           return acc
         }, [])
         
         return {
           id: visitador.id,
           nombre: visitador.nombre,
-          ventas: ventasPorMes.sort((a, b) => {
+          ventas: ventasPorSemana.sort((a, b) => {
             if (a.año !== b.año) return b.año - a.año
-            return b.mes - a.mes
+            return b.semana - a.semana
           }),
-          cobros: cobrosPorMes.sort((a, b) => {
+          cobros: cobrosPorSemana.sort((a, b) => {
             if (a.año !== b.año) return b.año - a.año
-            return b.mes - a.mes
+            return b.semana - a.semana
           })
         }
       })
       
-      console.log('Datos finales:', visitadoresData)
       setVisitadores(visitadoresData)
     } catch (err) {
-      console.error('Error al cargar ventas mensuales:', err)
-      setError('Error al cargar las ventas mensuales')
+      console.error('Error al cargar ventas semanales:', err)
+      setError('Error al cargar las ventas semanales')
     } finally {
       setLoading(false)
     }
@@ -141,26 +128,37 @@ export default function VentasMensualesPage() {
     loadVentasMensuales()
   }, [])
   
-  const getNombreMes = (mes: number) => {
-    const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ]
-    return meses[mes - 1]
+  const getSemanaDelAño = (fecha: Date) => {
+    const inicioAño = new Date(fecha.getFullYear(), 0, 1)
+    const diff = fecha.getTime() - inicioAño.getTime()
+    const unDia = 1000 * 60 * 60 * 24
+    const dia = Math.floor(diff / unDia)
+    return Math.ceil((dia + inicioAño.getDay() + 1) / 7)
+  }
+
+  const getRangoFechasSemana = (semana: number, año: number) => {
+    const inicioAño = new Date(año, 0, 1)
+    const primerDiaSemana = new Date(inicioAño)
+    primerDiaSemana.setDate(inicioAño.getDate() + (semana - 1) * 7 - inicioAño.getDay() + 1)
+    
+    const ultimoDiaSemana = new Date(primerDiaSemana)
+    ultimoDiaSemana.setDate(primerDiaSemana.getDate() + 6)
+    
+    const formatearFecha = (fecha: Date) => {
+      return fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+    }
+    
+    return `${formatearFecha(primerDiaSemana)} al ${formatearFecha(ultimoDiaSemana)}`
   }
 
   const calcularTotales = (visitador: Visitador) => {
     const totalVentas = visitador.ventas.reduce((sum, venta) => sum + venta.total, 0)
     const totalCobros = visitador.cobros.reduce((sum, cobro) => sum + cobro.total, 0)
-
-    return {
-      totalVentas,
-      totalCobros
-    }
+    return { totalVentas, totalCobros }
   }
   
   if (loading) {
-    return <div>Cargando ventas mensuales...</div>
+    return <div>Cargando ventas semanales...</div>
   }
   
   if (error) {
@@ -170,7 +168,7 @@ export default function VentasMensualesPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">
-        {usuario?.rol === 'admin' ? 'Ventas Mensuales por Visitador' : 'Mis Ventas Mensuales'}
+        {usuario?.rol === 'admin' ? 'Ventas Semanales por Visitador' : 'Mis Ventas Semanales'}
       </h1>
       
       {visitadores.map(visitador => {
@@ -182,28 +180,44 @@ export default function VentasMensualesPage() {
               <table className="w-full border-collapse table-auto text-sm">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="px-4 py-2 text-left">Mes</th>
-                    <th className="px-4 py-2 text-left">Año</th>
+                    <th className="px-4 py-2 text-left">Semana</th>
+                    <th className="px-4 py-2 text-left">Período</th>
+                    <th className="px-4 py-2 text-right">Meta</th>
                     <th className="px-4 py-2 text-right">Ventas</th>
+                    <th className="px-4 py-2 text-right">% Meta</th>
                     <th className="px-4 py-2 text-right">Cobros</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visitador.ventas.length > 0 || visitador.cobros.length > 0 ? (
                     [...new Set([
-                      ...visitador.ventas.map(v => `${v.año}-${v.mes}`),
-                      ...visitador.cobros.map(c => `${c.año}-${c.mes}`)
-                    ])].sort().reverse().map(mesKey => {
-                      const [año, mes] = mesKey.split('-').map(Number)
-                      const venta = visitador.ventas.find(v => v.mes === mes && v.año === año)
-                      const cobro = visitador.cobros.find(c => c.mes === mes && c.año === año)
+                      ...visitador.ventas.map(v => `${v.año}-${v.semana}`),
+                      ...visitador.cobros.map(c => `${c.año}-${c.semana}`)
+                    ])].sort().reverse().map(semanaKey => {
+                      const [año, semana] = semanaKey.split('-').map(Number)
+                      const venta = visitador.ventas.find(v => v.semana === semana && v.año === año)
+                      const cobro = visitador.cobros.find(c => c.semana === semana && c.año === año)
 
                       return (
-                        <tr key={mesKey} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-2">{getNombreMes(mes)}</td>
-                          <td className="px-4 py-2">{año}</td>
+                        <tr key={semanaKey} className="border-b hover:bg-gray-50">
+                          <td className="px-4 py-2">Semana {semana}</td>
+                          <td className="px-4 py-2">{getRangoFechasSemana(semana, año)}</td>
+                          <td className="px-4 py-2 text-right">
+                            Q{(20000).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </td>
                           <td className="px-4 py-2 text-right">
                             Q{(venta?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              (venta?.porcentaje || 0) >= 100 
+                                ? 'bg-green-100 text-green-800' 
+                                : (venta?.porcentaje || 0) >= 50 
+                                  ? 'bg-yellow-100 text-yellow-800' 
+                                  : 'bg-red-100 text-red-800'
+                            }`}>
+                              {(venta?.porcentaje || 0).toFixed(1)}%
+                            </span>
                           </td>
                           <td className="px-4 py-2 text-right">
                             Q{(cobro?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
@@ -213,7 +227,7 @@ export default function VentasMensualesPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
+                      <td colSpan={6} className="px-4 py-2 text-center text-gray-500">
                         No hay datos registrados
                       </td>
                     </tr>
@@ -223,7 +237,13 @@ export default function VentasMensualesPage() {
                   <tr className="bg-gray-100 font-semibold">
                     <td colSpan={2} className="px-4 py-2 text-right">Totales:</td>
                     <td className="px-4 py-2 text-right">
+                      Q{(20000 * visitador.ventas.length).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-2 text-right">
                       Q{totales.totalVentas.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {((totales.totalVentas / (20000 * visitador.ventas.length)) * 100).toFixed(1)}%
                     </td>
                     <td className="px-4 py-2 text-right">
                       Q{totales.totalCobros.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
