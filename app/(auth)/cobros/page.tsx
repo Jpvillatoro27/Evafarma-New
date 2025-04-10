@@ -157,38 +157,34 @@ export default function CobrosPage() {
     }
   }
 
+  const loadClientes = async () => {
+    try {
+      const data = await clientesService.getClientes()
+      const usuario = await usuariosService.getUsuarioActual()
+      
+      // Filtrar los clientes según el rol del usuario
+      const clientesFiltrados = usuario?.rol === 'admin'
+        ? data
+        : data.filter(cliente => cliente.visitador === usuario?.id)
+      
+      setClientes(clientesFiltrados)
+    } catch (error) {
+      console.error('Error al cargar clientes:', error)
+    }
+  }
+
+  const loadVisitadores = async () => {
+    try {
+      const data = await usuariosService.getVisitadores()
+      setVisitadores(data)
+    } catch (error) {
+      console.error('Error al cargar visitadores:', error)
+    }
+  }
+
   useEffect(() => {
     loadCobros()
-  }, [])
-
-  useEffect(() => {
-    const loadClientes = async () => {
-      try {
-        const data = await clientesService.getClientes()
-        const usuario = await usuariosService.getUsuarioActual()
-        
-        // Filtrar los clientes según el rol del usuario
-        const clientesFiltrados = usuario?.rol === 'admin'
-          ? data
-          : data.filter(cliente => cliente.visitador === usuario?.id)
-        
-        setClientes(clientesFiltrados)
-      } catch (error) {
-        console.error('Error al cargar clientes:', error)
-      }
-    }
     loadClientes()
-  }, [])
-
-  useEffect(() => {
-    const loadVisitadores = async () => {
-      try {
-        const data = await usuariosService.getVisitadores()
-        setVisitadores(data)
-      } catch (error) {
-        console.error('Error al cargar visitadores:', error)
-      }
-    }
     loadVisitadores()
   }, [])
 
@@ -503,6 +499,7 @@ export default function CobrosPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitador</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -520,6 +517,9 @@ export default function CobrosPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {cobro.clientes?.nombre}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {visitadores.find(v => v.id === cobro.visitador)?.nombre || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{cobro.descripcion}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
