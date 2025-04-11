@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import { usuariosService } from '@/lib/services'
-import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/use-toast'
+import { MapPinIcon } from '@heroicons/react/24/outline'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/components/ui/use-toast'
 
 interface Usuario {
   id: string
   email: string
   nombre: string
   rol: 'admin' | 'visitador'
+  giras?: string
 }
 
 export default function UsuariosPage() {
@@ -20,33 +22,59 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const { toast } = useToast()
-
+  const [isGirasDialogOpen, setIsGirasDialogOpen] = useState(false)
+  const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null)
+  const [giras, setGiras] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     nombre: ''
   })
+  const { toast } = useToast()
+
+  const loadUsuarios = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await usuariosService.getVisitadores()
+      setUsuarios(data)
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error)
+      setError(error instanceof Error ? error.message : 'Error al cargar los usuarios')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function loadUsuarios() {
-      try {
-        setLoading(true)
-        const data = await usuariosService.getVisitadores()
-        setUsuarios(data.map(usuario => ({
-          ...usuario,
-          rol: 'visitador' as const
-        })))
-      } catch (err) {
-        console.error('Error al cargar visitadores:', err)
-        setError('Error al cargar los visitadores')
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadUsuarios()
   }, [])
+
+  const handleOpenGirasDialog = (usuario: Usuario) => {
+    setSelectedUsuario(usuario)
+    setGiras(usuario.giras || '')
+    setIsGirasDialogOpen(true)
+  }
+
+  const handleSaveGiras = async () => {
+    if (!selectedUsuario) return
+
+    try {
+      await usuariosService.updateUsuario(selectedUsuario.id, { giras })
+      toast({
+        title: 'Giras actualizadas',
+        description: 'Las giras se han actualizado correctamente',
+      })
+      loadUsuarios()
+      setIsGirasDialogOpen(false)
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'No se pudieron actualizar las giras',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,10 +91,7 @@ export default function UsuariosPage() {
     try {
       const data = await usuariosService.register(formData.email, formData.password, formData.nombre)
       if (data) {
-        // Recargar la lista de usuarios
-        const updatedData = await usuariosService.getVisitadores()
-        setUsuarios(updatedData)
-        
+        loadUsuarios()
         setFormData({
           email: '',
           password: '',
@@ -88,18 +113,10 @@ export default function UsuariosPage() {
     }
   }
 
-  if (loading) {
-    return <div>Cargando visitadores...</div>
-  }
-
-  if (error) {
-    return <div className="text-red-600">{error}</div>
-  }
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Visitadores</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Visitadores</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>Nuevo Visitador</Button>
@@ -144,30 +161,76 @@ export default function UsuariosPage() {
         </Dialog>
       </div>
 
-      {usuarios.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-600">No hay visitadores registrados</p>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse table-auto">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="px-4 py-2 text-left">Nombre</th>
-                <th className="px-4 py-2 text-left">Email</th>
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giras</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {usuarios.map((usuario) => (
-                <tr key={usuario.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-2">{usuario.nombre}</td>
-                  <td className="px-4 py-2">{usuario.email}</td>
+                <tr key={usuario.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{usuario.nombre}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{usuario.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {usuario.giras || 'Sin giras asignadas'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <button
+                      onClick={() => handleOpenGirasDialog(usuario)}
+                      className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1"
+                      title="Editar giras"
+                    >
+                      <MapPinIcon className="h-5 w-5" />
+                      <span>Agregar gira</span>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <Dialog open={isGirasDialogOpen} onOpenChange={setIsGirasDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Giras</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="giras">Giras</Label>
+              <Input
+                id="giras"
+                value={giras}
+                onChange={(e) => setGiras(e.target.value)}
+                placeholder="Ingrese las giras del visitador"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsGirasDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveGiras}>
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

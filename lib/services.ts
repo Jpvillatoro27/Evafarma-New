@@ -731,7 +731,7 @@ export const usuariosService = {
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nombre, email, rol')
+        .select('id, nombre, email, rol, giras')
         .eq('rol', 'visitador')
         .order('nombre')
 
@@ -739,6 +739,20 @@ export const usuariosService = {
       return data || []
     } catch (error) {
       console.error('Error al obtener visitadores:', error)
+      throw error
+    }
+  },
+
+  async updateUsuario(id: string, data: { giras?: string }) {
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update(data)
+        .eq('id', id)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error al actualizar usuario:', error)
       throw error
     }
   }
