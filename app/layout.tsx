@@ -4,13 +4,12 @@ import { Inter } from 'next/font/google'
 import Navbar from '@/components/Navbar'
 import { usePathname } from 'next/navigation'
 import { Toaster } from '@/components/ui/toaster'
-import { AuthProvider } from '@/lib/providers/AuthProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'EvaFarma',
-  description: 'Sistema de gestión para EvaFarma',
+  title: 'EvaFarma - Sistema de Gestión',
+  description: 'Sistema de gestión para visitadores médicos',
 }
 
 export default function RootLayout({
@@ -21,12 +20,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <AuthProvider>
-          <div className="min-h-screen bg-gray-50">
-            {children}
-            <Toaster />
-          </div>
-        </AuthProvider>
+        <div className="min-h-screen bg-gray-50">
+          {children}
+          <Toaster />
+        </div>
       </body>
     </html>
   )
