@@ -201,73 +201,28 @@ export default function CobrosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validaciones
-    if (!formData.numero.trim()) {
+    if (!formData.cliente_id || !formData.total) {
       toast({
-        title: "Error",
-        description: "El número de cobro es requerido",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.fecha) {
-      toast({
-        title: "Error",
-        description: "La fecha es requerida",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.cliente_id) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar un cliente",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.visitador) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar un visitador",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (formData.total <= 0) {
-      toast({
-        title: "Error",
-        description: "El total debe ser mayor a 0",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Preparar datos para envío
-    const cobroData = {
-      ...formData,
-      fecha: formData.fecha || new Date().toISOString().split('T')[0],
-      fecha_cheque: formData.fecha_cheque || undefined,
-      valor_cheque: formData.valor_cheque || undefined,
-      banco: formData.banco || undefined,
-      numero_cheque: formData.numero_cheque || undefined,
-      otros: formData.otros || undefined,
-      otros2: formData.otros2 || undefined,
-      otros3: formData.otros3 || undefined,
-      total: Number(formData.total)
-    };
-
-    if (!window.confirm('¿Está seguro de crear este cobro?')) {
-      return;
+        title: 'Error',
+        description: 'Cliente y total son campos requeridos',
+        variant: 'destructive'
+      })
+      return
     }
 
     try {
-      const nuevoCobro = await cobrosService.createCobro(cobroData)
-      setCobros([...cobros, nuevoCobro as Cobro])
+      // Calcular el total incluyendo el valor del cheque si existe
+      const totalConCheque = formData.valor_cheque 
+        ? formData.total + formData.valor_cheque 
+        : formData.total
+
+      const cobroData = {
+        ...formData,
+        total: totalConCheque
+      }
+
+      await cobrosService.createCobro(cobroData)
+      loadCobros()
       setFormData({
         numero: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -284,13 +239,11 @@ export default function CobrosPage() {
         otros2: '',
         otros3: ''
       })
-      setSelectedCliente(null)
       setIsDialogOpen(false)
       toast({
         title: 'Cobro creado',
         description: 'El cobro se ha creado correctamente'
       })
-      loadCobros()
     } catch (err) {
       console.error('Error al crear cobro:', err)
       toast({
@@ -406,16 +359,17 @@ export default function CobrosPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="numero">Número de Cobro</Label>
+                    <Label htmlFor="numero">Número de Cobro *</Label>
                     <Input
                       id="numero"
+                      type="text"
                       value={formData.numero}
                       onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="fecha">Fecha</Label>
+                    <Label htmlFor="fecha">Fecha *</Label>
                     <Input
                       id="fecha"
                       type="date"
@@ -427,16 +381,13 @@ export default function CobrosPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="cliente">Cliente</Label>
-                  <Select
-                    value={formData.cliente_id}
-                    onValueChange={handleClienteChange}
-                  >
+                  <Label htmlFor="cliente">Cliente *</Label>
+                  <Select onValueChange={handleClienteChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un cliente" />
+                      <SelectValue placeholder="Seleccione un cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clientes.map(cliente => (
+                      {clientes.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
                           {cliente.nombre} ({cliente.codigo})
                         </SelectItem>
@@ -446,16 +397,7 @@ export default function CobrosPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="descripcion">Descripción</Label>
-                  <Input
-                    id="descripcion"
-                    value={formData.descripcion}
-                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="total">Total</Label>
+                  <Label htmlFor="total">Total *</Label>
                   <Input
                     id="total"
                     type="number"
@@ -465,18 +407,57 @@ export default function CobrosPage() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit">
-                    Crear Cobro
-                  </Button>
+                <div className="space-y-4 border p-4 rounded-lg">
+                  <h3 className="font-medium">Datos del Cheque (Opcional)</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="fecha_cheque">Fecha del Cheque</Label>
+                      <Input
+                        id="fecha_cheque"
+                        type="date"
+                        value={formData.fecha_cheque}
+                        onChange={(e) => setFormData({ ...formData, fecha_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="banco">Banco</Label>
+                      <Input
+                        id="banco"
+                        value={formData.banco}
+                        onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="numero_cheque">Número de Cheque</Label>
+                      <Input
+                        id="numero_cheque"
+                        value={formData.numero_cheque}
+                        onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="valor_cheque">Valor del Cheque</Label>
+                      <Input
+                        id="valor_cheque"
+                        type="number"
+                        value={formData.valor_cheque}
+                        onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <div>
+                  <Label htmlFor="otros">Comentarios</Label>
+                  <Input
+                    id="otros"
+                    value={formData.otros}
+                    onChange={(e) => setFormData({ ...formData, otros: e.target.value })}
+                    placeholder="Ingrese comentarios adicionales"
+                  />
+                </div>
+
+                <Button type="submit" className="w-full">Crear Cobro</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -496,46 +477,57 @@ export default function CobrosPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitador</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cheque</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comentarios</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                 {user?.rol === 'admin' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {cobrosFiltrados.map((cobro) => (
                 <tr key={cobro.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{cobro.numero}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {format(new Date(cobro.fecha), 'PPP', { locale: es })}
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cobro.numero}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     {cobro.clientes?.nombre}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {visitadores.find(v => v.id === cobro.visitador)?.nombre || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{cobro.descripcion}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     Q{cobro.total.toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    {cobro.numero_cheque ? (
+                      <div className="text-xs">
+                        <div>Banco: {cobro.banco}</div>
+                        <div>N°: {cobro.numero_cheque}</div>
+                        <div>Fecha: {cobro.fecha_cheque && format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy', { locale: es })}</div>
+                        <div>Valor: Q{cobro.valor_cheque?.toFixed(2)}</div>
+                      </div>
+                    ) : (
+                      'No aplica'
+                    )}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
+                    {cobro.otros || 'Sin comentarios'}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      cobro.Estado === 'Confirmado'
-                        ? 'bg-green-100 text-green-800'
+                      cobro.Estado === 'Confirmado' 
+                        ? 'bg-green-100 text-green-800' 
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
                       {cobro.Estado === 'Confirmado' ? 'Confirmado' : 'Pendiente'}
                     </span>
                   </td>
                   {user?.rol === 'admin' && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                       <button
                         onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
                         disabled={cobro.Estado === 'Confirmado'}
