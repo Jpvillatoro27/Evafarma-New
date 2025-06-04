@@ -571,12 +571,14 @@ export default function CobrosPage() {
       doc.line(10, y, 154, y)
       y += 10
       // Nota final
-      doc.setFontSize(8)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
       const nota = 'Nota: Este recibo es el único comprobante de pago que se reconoce. Si su cheque sale rechazado este recibo no tiene validez y se le cobrarán Q100.00 por gastos administrativos.'
       const notaLines = doc.splitTextToSize(nota, 140)
       doc.text(notaLines, 82, y, { align: 'center' })
-      y += notaLines.length * 10
+      y += notaLines.length * 12
       doc.text('Gracias por su pago', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
       doc.save(`Cobro_${cobro.numero || 'ticket'}.pdf`)
     }
   }
