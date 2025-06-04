@@ -5,7 +5,7 @@ import { cobrosService, clientesService, usuariosService, ventasService } from '
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/lib/hooks/useAuth'
 import { CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { jsPDF } from 'jspdf'
+import { supabase } from '@/lib/supabase'
 
 interface Cobro {
   id: string
@@ -269,11 +270,29 @@ export default function CobrosPage() {
     }
 
     try {
+      // Buscar el número de cobro más alto existente
+      const { data: cobrosTodos } = await supabase
+        .from('cobros')
+        .select('numero');
+
+      let maxNum = 0;
+      if (Array.isArray(cobrosTodos)) {
+        cobrosTodos.forEach(c => {
+          if (c.numero && /^C\d{9}$/.test(c.numero)) {
+            const num = parseInt(c.numero.replace('C', ''), 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        });
+      }
+      const nuevoNumero = `C${(maxNum + 1).toString().padStart(9, '0')}`;
+
       // Limpiar campos opcionales de cheque
       const cobroData = {
         ...formData,
+        numero: nuevoNumero,
         total: formData.total + (formData.valor_cheque || 0),
-        numero: '',
         fecha_cheque: formData.fecha_cheque ? formData.fecha_cheque : undefined,
         banco: formData.banco ? formData.banco : undefined,
         numero_cheque: formData.numero_cheque ? formData.numero_cheque : undefined,
@@ -402,11 +421,11 @@ export default function CobrosPage() {
       doc.text('RECIBO DE COBRO', 82, y, { align: 'center' })
       y += 24
       doc.setFontSize(9)
-      doc.text(`No. Cobro: ${cobro.numero || '-'} `, 10, y)
+      doc.text(`No. Cobro: ${cobro.numero || '-'}` , 10, y)
       y += 14
-      doc.text(`Fecha: ${cobro.fecha ? format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es }) : '-'} `, 10, y)
+      doc.text(`Fecha: ${cobro.fecha ? format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}` , 10, y)
       y += 14
-      doc.text(`Cliente: ${cobro.clientes?.nombre || 'N/D'} `, 10, y)
+      doc.text(`Cliente: ${cobro.clientes?.nombre || 'N/D'}` , 10, y)
       y += 14
       doc.text(`Monto: Q${cobro.total?.toFixed(2) || '0.00'}`, 10, y)
       y += 14
@@ -426,7 +445,6 @@ export default function CobrosPage() {
       doc.setFontSize(8)
       doc.text('Gracias por su pago', 82, y, { align: 'center' })
       doc.save(`Cobro_${cobro.numero || 'ticket'}.pdf`)
-      doc.autoPrint(); window.open(doc.output('bloburl'), '_blank');
     }
   }
 
@@ -490,9 +508,12 @@ export default function CobrosPage() {
             <DialogTrigger asChild>
               <Button>Nuevo Cobro</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl" aria-describedby="dialog-description">
               <DialogHeader>
                 <DialogTitle>Nuevo Cobro</DialogTitle>
+                <DialogDescription id="dialog-description">
+                  Complete los datos para crear un nuevo cobro
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -617,7 +638,7 @@ export default function CobrosPage() {
           {error}
         </div>
       ) : (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="bg-white shadow-md rounded-lg overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -635,71 +656,73 @@ export default function CobrosPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {cobrosFiltrados.map((cobro) => (
-                <tr key={cobro.id}>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cobro.numero}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    {cobro.clientes?.nombre}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    {(() => {
-                      const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
-                      return visitadorObj?.nombre || 'Sin nombre'
-                    })()}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    Q{cobro.total.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    {cobro.numero_cheque ? (
-                      <div className="text-xs">
-                        <div>Banco: {cobro.banco}</div>
-                        <div>N°: {cobro.numero_cheque}</div>
-                        <div>Fecha: {cobro.fecha_cheque && format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy', { locale: es })}</div>
-                        <div>Valor: Q{cobro.valor_cheque?.toFixed(2)}</div>
-                      </div>
-                    ) : (
-                      'No aplica'
+              {[...cobrosFiltrados]
+                .sort((a, b) => (a.numero < b.numero ? 1 : -1))
+                .map((cobro) => (
+                  <tr key={cobro.id}>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cobro.numero}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      {format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es })}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      {cobro.clientes?.nombre}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      {(() => {
+                        const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
+                        return visitadorObj?.nombre || 'Sin nombre'
+                      })()}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      Q{cobro.total.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      {cobro.numero_cheque ? (
+                        <div className="text-xs">
+                          <div>Banco: {cobro.banco}</div>
+                          <div>N°: {cobro.numero_cheque}</div>
+                          <div>Fecha: {cobro.fecha_cheque && format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy', { locale: es })}</div>
+                          <div>Valor: Q{cobro.valor_cheque?.toFixed(2)}</div>
+                        </div>
+                      ) : (
+                        'No aplica'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
+                      {cobro.otros || 'Sin comentarios'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        cobro.Estado === 'Confirmado' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {cobro.Estado === 'Confirmado' ? 'Confirmado' : 'Pendiente'}
+                      </span>
+                    </td>
+                    {user?.rol === 'admin' && (
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        <button
+                          onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
+                          disabled={cobro.Estado === 'Confirmado'}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title={cobro.Estado === 'Confirmado' ? 'Cobro ya confirmado' : 'Confirmar cobro'}
+                        >
+                          <CheckCircleIcon className="h-5 w-5" />
+                        </button>
+                      </td>
                     )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
-                    {cobro.otros || 'Sin comentarios'}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      cobro.Estado === 'Confirmado' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {cobro.Estado === 'Confirmado' ? 'Confirmado' : 'Pendiente'}
-                    </span>
-                  </td>
-                  {user?.rol === 'admin' && (
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                        disabled={cobro.Estado === 'Confirmado'}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title={cobro.Estado === 'Confirmado' ? 'Cobro ya confirmado' : 'Confirmar cobro'}
+                        onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
+                        title="Imprimir ticket"
+                        className="text-gray-600 hover:text-indigo-600"
                       >
-                        <CheckCircleIcon className="h-5 w-5" />
+                        <PrinterIcon className="h-5 w-5" />
                       </button>
                     </td>
-                  )}
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    <button
-                      onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
-                      title="Imprimir ticket"
-                      className="text-gray-600 hover:text-indigo-600"
-                    >
-                      <PrinterIcon className="h-5 w-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

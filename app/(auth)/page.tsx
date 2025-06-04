@@ -96,9 +96,7 @@ export default function HomePage() {
             href: '/resumen-departamento',
             icon: (
               <svg className="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="10" width="4" height="10" rx="2" fill="#6366f1" />
-                <rect x="9" y="6" width="4" height="14" rx="2" fill="#a5b4fc" />
-                <rect x="15" y="2" width="4" height="18" rx="2" fill="#c7d2fe" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             ),
           },

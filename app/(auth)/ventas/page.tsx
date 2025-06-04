@@ -577,11 +577,12 @@ export default function VentasPage() {
               // Prevenir que el diálogo se cierre al hacer clic fuera
               e.preventDefault()
             }}
+            aria-describedby="dialog-description"
           >
             <DialogHeader>
               <DialogTitle>Crear Nueva Venta</DialogTitle>
-              <DialogDescription>
-                Complete el formulario para registrar una nueva venta. Seleccione el cliente, la fecha y los productos a vender.
+              <DialogDescription id="dialog-description">
+                Complete los datos para crear una nueva venta
               </DialogDescription>
             </DialogHeader>
             <form 
