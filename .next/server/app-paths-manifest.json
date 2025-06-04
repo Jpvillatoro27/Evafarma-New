@@ -1,7 +1,8 @@
 {
   "/login/page": "app/login/page.js",
-  "/(auth)/page": "app/(auth)/page.js",
+  "/api/ventas/pendientes/[clienteId]/route": "app/api/ventas/pendientes/[clienteId]/route.js",
+  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
   "/(auth)/resumen-departamento/page": "app/(auth)/resumen-departamento/page.js",
-  "/(auth)/ventas/page": "app/(auth)/ventas/page.js",
-  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js"
+  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js",
+  "/(auth)/ventas/page": "app/(auth)/ventas/page.js"
 }

@@ -268,6 +268,15 @@ export default function CobrosPage() {
       })
       return
     }
+    // Validación: el total del cobro no puede ser mayor al saldo_venta
+    if (ventaSeleccionada && (formData.total + (formData.valor_cheque || 0)) > ventaSeleccionada.saldo_venta) {
+      toast({
+        title: 'Error',
+        description: 'El monto del cobro no puede ser mayor al saldo pendiente de la venta.',
+        variant: 'destructive'
+      })
+      return
+    }
 
     try {
       // Buscar el número de cobro más alto existente
