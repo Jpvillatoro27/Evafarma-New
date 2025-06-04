@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usuariosService } from '@/lib/services'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { HomeIcon, UserGroupIcon, ShoppingCartIcon, BanknotesIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline'
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -36,10 +37,11 @@ export default function Navbar() {
   const navigation = [
     { name: 'Inicio', href: '/' },
     { name: 'Clientes', href: '/clientes' },
-    { name: 'Cobros', href: '/cobros' },
     { name: 'Ventas', href: '/ventas' },
-    { name: 'Ventas Mensuales', href: '/ventas-mensuales' },
+    { name: 'Cobros', href: '/cobros' },
     ...(isAdmin ? [
+      { name: 'Comisiones', href: '/comisiones' },
+      { name: 'Ventas Mensuales', href: '/ventas-mensuales' },
       { name: 'Productos', href: '/productos' },
       { name: 'Visitadores', href: '/usuarios' }
     ] : []),

@@ -12,7 +12,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Producto } from '@/types'
-import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { jsPDF } from 'jspdf'
 
 interface ProductoVenta {
   id: string
@@ -33,6 +34,7 @@ interface Venta {
   visitador: string
   rastreo?: string
   estado?: string
+  saldo_venta?: number
   clientes: {
     id: string
     nombre: string
@@ -487,6 +489,69 @@ export default function VentasPage() {
     }
   }
 
+  // Función para imprimir el ticket de la venta
+  const handleImprimirVenta = async (venta: Venta) => {
+    const doc = new jsPDF({ unit: 'pt', format: [220, 350], orientation: 'portrait' })
+    let y = 24
+    // Agregar logo
+    try {
+      const response = await fetch('/sin-titulo.png')
+      const blob = await response.blob()
+      const reader = new FileReader()
+      reader.onloadend = function () {
+        const base64data = reader.result as string
+        doc.addImage(base64data, 'PNG', 60, y, 100, 36)
+        y += 60 // Más espacio entre logo y texto
+        agregarContenido()
+      }
+      reader.readAsDataURL(blob)
+    } catch (e) {
+      doc.setFontSize(16)
+      doc.text('EvaFarma', 110, y, { align: 'center' })
+      y += 50
+      agregarContenido()
+    }
+    function agregarContenido() {
+      doc.setFontSize(16)
+      doc.text('RECIBO DE VENTA', 110, y, { align: 'center' })
+      y += 28
+      doc.setFontSize(10)
+      doc.text(`Código: ${venta.codigo}`, 16, y)
+      y += 16
+      doc.text(`Cliente: ${venta.clientes.nombre}`, 16, y)
+      y += 16
+      doc.text(`Fecha: ${new Date(venta.fecha).toLocaleDateString()}`, 16, y)
+      y += 16
+      doc.text(`Visitador: ${visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}`, 16, y)
+      y += 16
+      doc.text(`Total: Q${venta.total.toFixed(2)}`, 16, y)
+      y += 20
+      doc.setFontSize(11)
+      doc.text('Productos:', 16, y)
+      y += 14
+      doc.setFontSize(10)
+      if (venta.productos && venta.productos.length > 0) {
+        venta.productos.forEach((prod, idx) => {
+          doc.text(`• ${prod.nombre} - ${prod.cantidad} x Q${prod.precio_unitario.toFixed(2)}`, 24, y)
+          y += 14
+        })
+      } else {
+        doc.text('Sin productos', 24, y)
+        y += 14
+      }
+      y += 10
+      // Línea de firma
+      doc.setLineWidth(0.5)
+      doc.line(16, y + 30, 204, y + 30)
+      doc.setFontSize(10)
+      doc.text('FIRMA:', 16, y + 24)
+      y += 50
+      doc.setFontSize(9)
+      doc.text('Gracias por su compra', 110, y, { align: 'center' })
+      doc.save(`Venta_${venta.codigo}.pdf`)
+    }
+  }
+
   if (loading) {
     return <div>Cargando ventas...</div>
   }
@@ -690,6 +755,7 @@ export default function VentasPage() {
               <th className="px-3 py-1.5 text-left">Fecha</th>
               <th className="px-3 py-1.5 text-left">Visitador</th>
               <th className="px-3 py-1.5 text-right">Total</th>
+              <th className="px-3 py-1.5 text-right">Saldo Venta</th>
               <th className="px-3 py-1.5 text-right">Saldo Pendiente</th>
               <th className="px-3 py-1.5 text-left">Rastreo</th>
               <th className="px-3 py-1.5 text-left">Estado</th>
@@ -712,15 +778,31 @@ export default function VentasPage() {
                   Q{venta.total.toFixed(2)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
+                  Q{venta.saldo_venta?.toFixed(2) ?? '0.00'}
+                </td>
+                <td className="px-3 py-1.5 text-right">
                   Q{venta.clientes.saldo_pendiente.toFixed(2)}
                 </td>
                 <td className="px-3 py-1.5">
                   {venta.rastreo || '-'}
                 </td>
                 <td className="px-3 py-1.5">
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${getEstadoColor(venta.estado)}`}>
-                    {venta.estado ? venta.estado.charAt(0).toUpperCase() + venta.estado.slice(1) : 'Sin Estado'}
-                  </span>
+                  {(() => {
+                    const dias = Math.floor((new Date().getTime() - new Date(venta.fecha).getTime()) / (1000 * 60 * 60 * 24));
+                    if (dias > 120 && (venta.saldo_venta ?? 0) > 0) {
+                      return (
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">
+                          El visitador debe pagar
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                          Pendiente
+                        </span>
+                      );
+                    }
+                  })()}
                 </td>
                 <td className="px-3 py-1.5">
                   {venta.productos && venta.productos.length > 0 && (
@@ -733,7 +815,14 @@ export default function VentasPage() {
                     </ul>
                   )}
                 </td>
-                <td className="px-3 py-1.5 space-x-1">
+                <td className="px-3 py-1.5 space-x-1 flex items-center gap-2">
+                  <button
+                    onClick={() => handleImprimirVenta(venta)}
+                    className="p-1.5 text-gray-600 hover:text-indigo-600 transition-colors"
+                    title="Imprimir recibo de venta"
+                  >
+                    <PrinterIcon className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={() => handleAgregarRastreo(venta)}
                     className="p-1.5 text-blue-600 hover:text-blue-800 transition-colors"

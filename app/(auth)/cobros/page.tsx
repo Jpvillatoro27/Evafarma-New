@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { cobrosService, clientesService, usuariosService } from '@/lib/services'
+import { cobrosService, clientesService, usuariosService, ventasService } from '@/lib/services'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { CheckCircleIcon } from '@heroicons/react/24/outline'
+import { CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { jsPDF } from 'jspdf'
 
 interface Cobro {
   id: string
@@ -50,6 +51,15 @@ interface Visitador {
   email: string
 }
 
+interface VentaPendiente {
+  id: string
+  codigo: string
+  fecha: string
+  total: number
+  saldo_venta: number
+  dias_venta: number
+}
+
 export default function CobrosPage() {
   const [cobros, setCobros] = useState<Cobro[]>([])
   const [cobrosFiltrados, setCobrosFiltrados] = useState<Cobro[]>([])
@@ -63,7 +73,6 @@ export default function CobrosPage() {
   const { user } = useAuth()
 
   const [formData, setFormData] = useState({
-    numero: '',
     fecha: new Date().toISOString().split('T')[0],
     cod_farmacia: '',
     cliente_id: '',
@@ -76,11 +85,15 @@ export default function CobrosPage() {
     valor_cheque: 0,
     otros: '',
     otros2: '',
-    otros3: ''
+    otros3: '',
+    venta_id: ''
   })
 
   const [selectedCliente, setSelectedCliente] = useState<any>(null)
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
+  const [ventasPendientes, setVentasPendientes] = useState<VentaPendiente[]>([])
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<VentaPendiente | null>(null)
+  const [ventas, setVentas] = useState<any[]>([])
 
   useEffect(() => {
     if (user?.id) {
@@ -188,7 +201,19 @@ export default function CobrosPage() {
     loadVisitadores()
   }, [])
 
-  const handleClienteChange = (clienteId: string) => {
+  useEffect(() => {
+    async function cargarVentas() {
+      try {
+        const data = await ventasService.getVentas()
+        setVentas(data)
+      } catch (error) {
+        console.error('Error al cargar ventas:', error)
+      }
+    }
+    cargarVentas()
+  }, [])
+
+  const handleClienteChange = async (clienteId: string) => {
     const cliente = clientes.find(c => c.id === clienteId)
     setSelectedCliente(cliente)
     setFormData(prev => ({
@@ -196,35 +221,69 @@ export default function CobrosPage() {
       cliente_id: clienteId,
       cod_farmacia: cliente?.codigo || ''
     }))
+
+    // Cargar ventas pendientes del cliente
+    try {
+      const response = await fetch(`/api/ventas/pendientes/${clienteId}`)
+      if (!response.ok) throw new Error('Error al cargar ventas pendientes')
+      const data = await response.json()
+      setVentasPendientes(data)
+    } catch (error) {
+      console.error('Error al cargar ventas pendientes:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar las ventas pendientes',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleVentaChange = (ventaId: string) => {
+    const venta = ventasPendientes.find(v => v.id === ventaId)
+    setVentaSeleccionada(venta || null)
+    setFormData(prev => ({
+      ...prev,
+      venta_id: ventaId,
+      total: venta?.saldo_venta || 0
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.cliente_id || !formData.total) {
+    if (!formData.cliente_id || !formData.venta_id) {
       toast({
         title: 'Error',
-        description: 'Cliente y total son campos requeridos',
+        description: 'Cliente y venta son campos requeridos',
+        variant: 'destructive'
+      })
+      return
+    }
+    if ((formData.total === 0 || formData.total === undefined || formData.total === null) && (!formData.valor_cheque || formData.valor_cheque <= 0)) {
+      toast({
+        title: 'Error',
+        description: 'Debe ingresar un monto en Total o en Valor del Cheque',
         variant: 'destructive'
       })
       return
     }
 
     try {
-      // Calcular el total incluyendo el valor del cheque si existe
-      const totalConCheque = formData.valor_cheque 
-        ? formData.total + formData.valor_cheque 
-        : formData.total
-
+      // Limpiar campos opcionales de cheque
       const cobroData = {
         ...formData,
-        total: totalConCheque
+        total: formData.total + (formData.valor_cheque || 0),
+        numero: '',
+        fecha_cheque: formData.fecha_cheque ? formData.fecha_cheque : undefined,
+        banco: formData.banco ? formData.banco : undefined,
+        numero_cheque: formData.numero_cheque ? formData.numero_cheque : undefined,
+        valor_cheque: formData.valor_cheque ? formData.valor_cheque : undefined
       }
 
-      await cobrosService.createCobro(cobroData)
+      const nuevoCobro = await cobrosService.createCobro(cobroData)
+      generarTicketCobroPDFCompleto(nuevoCobro, visitadores, ventas)
       loadCobros()
       setFormData({
-        numero: '',
         fecha: new Date().toISOString().split('T')[0],
         cod_farmacia: '',
         cliente_id: '',
@@ -237,7 +296,8 @@ export default function CobrosPage() {
         valor_cheque: 0,
         otros: '',
         otros2: '',
-        otros3: ''
+        otros3: '',
+        venta_id: ''
       })
       setIsDialogOpen(false)
       toast({
@@ -289,6 +349,84 @@ export default function CobrosPage() {
         description: 'No se pudo confirmar el cobro',
         variant: 'destructive'
       })
+    }
+  }
+
+  // Función para generar y descargar/imprimir el PDF del cobro
+  async function generarTicketCobroPDFCompleto(cobro: any, visitadores: any[], ventas: any[]) {
+    const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
+    const nombreVisitador = visitadorObj?.nombre || 'N/D'
+    let saldoVenta = 'N/D'
+    if (cobro.venta_id) {
+      try {
+        // Obtener la venta actualizada directamente de la base de datos
+        const response = await fetch(`/api/ventas/pendientes/venta/${cobro.venta_id}`)
+        if (response.ok) {
+          const venta = await response.json()
+          if (venta && typeof venta.saldo_venta === 'number') {
+            // Restar el monto cobrado solo visualmente
+            const montoCobrado = (cobro.total || 0)
+            const saldoVisual = venta.saldo_venta - montoCobrado
+            saldoVenta = `Q${saldoVisual.toFixed(2)}`
+          }
+        }
+      } catch (e) {
+        saldoVenta = 'N/D'
+      }
+    }
+    const doc = new jsPDF({
+      unit: 'pt',
+      format: [164, 300],
+      orientation: 'portrait'
+    })
+    let y = 20
+    try {
+      const response = await fetch('/sin-titulo.png')
+      const blob = await response.blob()
+      const reader = new FileReader()
+      reader.onloadend = function () {
+        const base64data = reader.result as string
+        doc.addImage(base64data, 'PNG', 42, y, 80, 30)
+        y += 48
+        agregarContenido()
+      }
+      reader.readAsDataURL(blob)
+    } catch (e) {
+      doc.setFontSize(16)
+      doc.text('EvaFarma', 82, y, { align: 'center' })
+      y += 34
+      agregarContenido()
+    }
+    function agregarContenido() {
+      doc.setFontSize(12)
+      doc.text('RECIBO DE COBRO', 82, y, { align: 'center' })
+      y += 24
+      doc.setFontSize(9)
+      doc.text(`No. Cobro: ${cobro.numero || '-'} `, 10, y)
+      y += 14
+      doc.text(`Fecha: ${cobro.fecha ? format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es }) : '-'} `, 10, y)
+      y += 14
+      doc.text(`Cliente: ${cobro.clientes?.nombre || 'N/D'} `, 10, y)
+      y += 14
+      doc.text(`Monto: Q${cobro.total?.toFixed(2) || '0.00'}`, 10, y)
+      y += 14
+      doc.text(`Descripción: ${cobro.descripcion || '-'}`, 10, y)
+      y += 14
+      doc.text(`Visitador: ${nombreVisitador}`, 10, y)
+      y += 14
+      doc.text(`Saldo pendiente de cobro: ${saldoVenta}`, 10, y)
+      y += 20
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 20
+      doc.text('FIRMA:', 10, y)
+      y += 30
+      doc.line(10, y, 154, y)
+      y += 10
+      doc.setFontSize(8)
+      doc.text('Gracias por su pago', 82, y, { align: 'center' })
+      doc.save(`Cobro_${cobro.numero || 'ticket'}.pdf`)
+      doc.autoPrint(); window.open(doc.output('bloburl'), '_blank');
     }
   }
 
@@ -359,16 +497,6 @@ export default function CobrosPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="numero">Número de Cobro *</Label>
-                    <Input
-                      id="numero"
-                      type="text"
-                      value={formData.numero}
-                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="fecha">Fecha *</Label>
                     <Input
                       id="fecha"
@@ -390,6 +518,22 @@ export default function CobrosPage() {
                       {clientes.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
                           {cliente.nombre} ({cliente.codigo})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="venta">Venta Pendiente *</Label>
+                  <Select onValueChange={handleVentaChange} value={ventaSeleccionada?.id || ''}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione una venta pendiente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ventasPendientes.map((venta) => (
+                        <SelectItem key={venta.id} value={venta.id}>
+                          {new Date(venta.fecha).toLocaleDateString()} - Q{venta.total.toFixed(2)} (Saldo: Q{venta.saldo_venta.toFixed(2)})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -480,6 +624,7 @@ export default function CobrosPage() {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitador</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cheque</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comentarios</th>
@@ -498,6 +643,12 @@ export default function CobrosPage() {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     {cobro.clientes?.nombre}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    {(() => {
+                      const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
+                      return visitadorObj?.nombre || 'Sin nombre'
+                    })()}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     Q{cobro.total.toFixed(2)}
@@ -538,6 +689,15 @@ export default function CobrosPage() {
                       </button>
                     </td>
                   )}
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    <button
+                      onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
+                      title="Imprimir ticket"
+                      className="text-gray-600 hover:text-indigo-600"
+                    >
+                      <PrinterIcon className="h-5 w-5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

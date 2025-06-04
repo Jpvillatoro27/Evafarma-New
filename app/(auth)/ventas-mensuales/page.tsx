@@ -9,6 +9,17 @@ interface VentaSemanal {
   total: number
   meta: number
   porcentaje: number
+  clientes: {
+    id: any
+    codigo: any
+    nombre: any
+    direccion: any
+    telefono: any
+    nit: any
+    propietario: any
+    saldo_pendiente: any
+    Departamento?: string
+  }[]
 }
 
 interface CobroSemanal {
@@ -36,6 +47,7 @@ export default function VentasMensualesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const [filtroDepartamento, setFiltroDepartamento] = useState<string>('todos')
   
   const loadVentasMensuales = async () => {
     try {
@@ -81,7 +93,8 @@ export default function VentasMensualesPage() {
               año, 
               total: venta.total,
               meta,
-              porcentaje: (venta.total / meta) * 100
+              porcentaje: (venta.total / meta) * 100,
+              clientes: venta.clientes
             })
           }
           return acc
@@ -157,6 +170,23 @@ export default function VentasMensualesPage() {
     return { totalVentas, totalCobros }
   }
   
+  // Obtener todos los departamentos de los clientes con ventas
+  const departamentosConVentas = Array.from(new Set(
+    visitadores.flatMap(v => v.ventas.flatMap(venta => 
+      venta.clientes.map(cliente => cliente.Departamento).filter(Boolean)
+    ))
+  ))
+  
+  // Filtrar visitadores y ventas por departamento
+  const visitadoresFiltrados = filtroDepartamento === 'todos'
+    ? visitadores
+    : visitadores.map(v => ({
+        ...v,
+        ventas: v.ventas.filter(venta => 
+          venta.clientes.some(cliente => cliente.Departamento === filtroDepartamento)
+        )
+      })).filter(v => v.ventas.length > 0)
+  
   if (loading) {
     return <div>Cargando ventas semanales...</div>
   }
@@ -170,8 +200,22 @@ export default function VentasMensualesPage() {
       <h1 className="text-2xl font-bold mb-6">
         {usuario?.rol === 'admin' ? 'Ventas Semanales por Visitador' : 'Mis Ventas Semanales'}
       </h1>
-      
-      {visitadores.map(visitador => {
+      {usuario?.rol === 'admin' && (
+        <div className="mb-4 flex gap-4 items-center">
+          <label className="font-medium">Filtrar por región:</label>
+          <select
+            value={filtroDepartamento}
+            onChange={e => setFiltroDepartamento(e.target.value)}
+            className="border rounded px-2 py-1 bg-white"
+          >
+            <option value="todos">Todos</option>
+            {departamentosConVentas.map(dep => (
+              <option key={dep} value={dep}>{dep}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {visitadoresFiltrados.map(visitador => {
         const totales = calcularTotales(visitador)
         return (
           <div key={visitador.id} className="mb-8">
