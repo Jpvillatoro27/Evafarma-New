@@ -173,6 +173,7 @@ export const cobrosService = {
           otros3,
           Estado,
           created_at,
+          venta_id,
           clientes:cliente_id (
             id,
             codigo,
@@ -446,6 +447,7 @@ export const ventasService = {
           created_at,
           estado,
           rastreo,
+          saldo_venta,
           clientes:cliente_id (
             id,
             codigo,
@@ -506,6 +508,7 @@ export const ventasService = {
           cliente_id: ventaData.cliente_id,
           visitador: ventaData.visitador,
           total: ventaData.total,
+          saldo_venta: ventaData.total,
           estado: 'pendiente' // Estado por defecto
         }])
         .select()

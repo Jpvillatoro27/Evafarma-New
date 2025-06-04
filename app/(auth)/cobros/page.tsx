@@ -373,26 +373,26 @@ export default function CobrosPage() {
 
   // Función para generar y descargar/imprimir el PDF del cobro
   async function generarTicketCobroPDFCompleto(cobro: any, visitadores: any[], ventas: any[]) {
+    console.log('Cobro recibido para impresión:', cobro)
     const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
     const nombreVisitador = visitadorObj?.nombre || 'N/D'
     let saldoVenta = 'N/D'
+    
+    // Solo para visualización en el PDF
     if (cobro.venta_id) {
       try {
-        // Obtener la venta actualizada directamente de la base de datos
-        const response = await fetch(`/api/ventas/pendientes/venta/${cobro.venta_id}`)
+        const response = await fetch(`/api/ventas/todas/venta/${cobro.venta_id}`)
         if (response.ok) {
           const venta = await response.json()
           if (venta && typeof venta.saldo_venta === 'number') {
-            // Restar el monto cobrado solo visualmente
-            const montoCobrado = (cobro.total || 0)
-            const saldoVisual = venta.saldo_venta - montoCobrado
-            saldoVenta = `Q${saldoVisual.toFixed(2)}`
+            saldoVenta = `Q${(venta.saldo_venta - (cobro.total || 0)).toFixed(2)}`
           }
         }
       } catch (e) {
         saldoVenta = 'N/D'
       }
     }
+
     const doc = new jsPDF({
       unit: 'pt',
       format: [164, 300],
