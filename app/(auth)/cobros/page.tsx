@@ -309,7 +309,10 @@ export default function CobrosPage() {
       }
 
       const nuevoCobro = await cobrosService.createCobro(cobroData)
-      generarTicketCobroPDFCompleto(nuevoCobro, visitadores, ventas)
+      // Buscar el cliente completo y agregarlo al cobro antes de imprimir
+      const clienteCompleto = clientes.find(c => c.id === nuevoCobro.cliente_id)
+      const cobroConCliente = { ...nuevoCobro, clientes: clienteCompleto }
+      generarTicketCobroPDFCompleto(cobroConCliente, visitadores, ventas)
       loadCobros()
       setFormData({
         fecha: new Date().toISOString().split('T')[0],
@@ -404,7 +407,7 @@ export default function CobrosPage() {
 
     const doc = new jsPDF({
       unit: 'pt',
-      format: [164, 300],
+      format: [164, 650],
       orientation: 'portrait'
     })
     let y = 20
@@ -427,22 +430,138 @@ export default function CobrosPage() {
     }
     function agregarContenido() {
       doc.setFontSize(12)
-      doc.text('RECIBO DE COBRO', 82, y, { align: 'center' })
+    
       y += 24
-      doc.setFontSize(9)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('INFORMACIÓN DEL COBRO', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
       doc.text(`No. Cobro: ${cobro.numero || '-'}` , 10, y)
       y += 14
       doc.text(`Fecha: ${cobro.fecha ? format(new Date(cobro.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}` , 10, y)
       y += 14
-      doc.text(`Cliente: ${cobro.clientes?.nombre || 'N/D'}` , 10, y)
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('INFORMACIÓN DEL CLIENTE', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
+      doc.text(`Nombre: ${cobro.clientes?.nombre || 'N/D'}` , 10, y)
+      y += 12
+      doc.text(`Código: ${cobro.clientes?.codigo || '-'}` , 10, y)
+      y += 12
+      const direccionLines = doc.splitTextToSize(`Dirección: ${cobro.clientes?.direccion || '-'}`, 140)
+      doc.text(direccionLines, 10, y)
+      y += direccionLines.length * 12
+      const telefonoLines = doc.splitTextToSize(`Teléfono: ${cobro.clientes?.telefono || '-'}`, 140)
+      doc.text(telefonoLines, 10, y)
+      y += telefonoLines.length * 12
+      const propietarioLines = doc.splitTextToSize(`Propietario: ${cobro.clientes?.propietario || '-'}`, 140)
+      doc.text(propietarioLines, 10, y)
+      y += propietarioLines.length * 12
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('DETALLE DEL COBRO', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
       y += 14
       doc.text(`Monto: Q${cobro.total?.toFixed(2) || '0.00'}`, 10, y)
       y += 14
-      doc.text(`Descripción: ${cobro.descripcion || '-'}`, 10, y)
+      // Apartado separado de Observaciones
+      if (cobro.otros && cobro.otros.trim() !== '') {
+        doc.setLineWidth(0.5)
+        doc.line(10, y, 154, y)
+        y += 10
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('OBSERVACIONES', 82, y, { align: 'center' })
+        doc.setFont('helvetica', 'normal')
+        y += 14
+        const observacionesLines = doc.splitTextToSize(cobro.otros, 140)
+        doc.text(observacionesLines, 10, y)
+        y += observacionesLines.length * 12
+      }
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+      // Sección: Saldos
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('SALDOS', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
+      // Saldo, Abono, Saldo pendiente
+      let codigoVenta = '-'
+      let saldoVentaNum = 0
+      if (cobro.venta_id && ventas && Array.isArray(ventas)) {
+        const ventaLigada = ventas.find(v => v.id === cobro.venta_id)
+        if (ventaLigada && ventaLigada.codigo) {
+          codigoVenta = ventaLigada.codigo
+        }
+        if (ventaLigada && typeof ventaLigada.saldo_venta === 'number') {
+          saldoVentaNum = ventaLigada.saldo_venta
+        }
+      }
+      const saldoText = doc.splitTextToSize(`Saldo: Q${saldoVentaNum.toFixed(2)}`, 140)
+      doc.text(saldoText, 10, y)
+      y += saldoText.length * 12
+      const abonoText = doc.splitTextToSize(`Abono: Q${(cobro.total || 0).toFixed(2)}`, 140)
+      doc.text(abonoText, 10, y)
+      y += abonoText.length * 12
+      const saldoPendienteText = doc.splitTextToSize(`Saldo pendiente: Q${(saldoVentaNum - (cobro.total || 0)).toFixed(2)}`, 140)
+      doc.text(saldoPendienteText, 10, y)
+      y += saldoPendienteText.length * 12
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+      // Apartado de estado (tabla de rangos)
+      if (cobro.venta_id && ventas && Array.isArray(ventas)) {
+        const ventaLigada = ventas.find(v => v.id === cobro.venta_id)
+        if (ventaLigada && ventaLigada.fecha && cobro.fecha) {
+          const fechaVenta = new Date(ventaLigada.fecha)
+          const fechaCobro = new Date(cobro.fecha)
+          const diffTime = fechaCobro.getTime() - fechaVenta.getTime()
+          const dias = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+          let label = ''
+          if (dias <= 30) label = 'A';
+          else if (dias <= 60) label = 'B';
+          else if (dias <= 90) label = 'C';
+          else if (dias <= 120) label = 'D';
+          doc.setFont('helvetica', 'bold')
+          doc.text('ESTADO', 82, y, { align: 'center' })
+          doc.setFont('helvetica', 'normal')
+          y += 14
+          // Tabla de rangos (A, B, C, D)
+          const rangos = [
+            { label: 'A', texto: '0 a 30', mostrar: label === 'A' ? (cobro.total || 0) : 0 },
+            { label: 'B', texto: '31 a 60', mostrar: label === 'B' ? (cobro.total || 0) : 0 },
+            { label: 'C', texto: '61 a 90', mostrar: label === 'C' ? (cobro.total || 0) : 0 },
+            { label: 'D', texto: '91 a 120', mostrar: label === 'D' ? (cobro.total || 0) : 0 },
+          ]
+          doc.text('Estado        Saldo', 10, y)
+          y += 12
+          rangos.forEach(r => {
+            doc.text(`${r.label} - ${r.texto}`, 10, y)
+            doc.text(`Q${r.mostrar.toFixed(2)}`, 110, y)
+            y += 12
+          })
+        }
+      }
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+      // Sección: Visitador
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('VISITADOR', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
       y += 14
       doc.text(`Visitador: ${nombreVisitador}`, 10, y)
-      y += 14
-      doc.text(`Saldo pendiente de cobro: ${saldoVenta}`, 10, y)
       y += 20
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
@@ -451,7 +570,12 @@ export default function CobrosPage() {
       y += 30
       doc.line(10, y, 154, y)
       y += 10
+      // Nota final
       doc.setFontSize(8)
+      const nota = 'Nota: Este recibo es el único comprobante de pago que se reconoce. Si su cheque sale rechazado este recibo no tiene validez y se le cobrarán Q100.00 por gastos administrativos.'
+      const notaLines = doc.splitTextToSize(nota, 140)
+      doc.text(notaLines, 82, y, { align: 'center' })
+      y += notaLines.length * 10
       doc.text('Gracias por su pago', 82, y, { align: 'center' })
       doc.save(`Cobro_${cobro.numero || 'ticket'}.pdf`)
     }
@@ -525,7 +649,7 @@ export default function CobrosPage() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="fecha">Fecha *</Label>
                     <Input
@@ -537,7 +661,6 @@ export default function CobrosPage() {
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label htmlFor="cliente">Cliente *</Label>
                   <Select onValueChange={handleClienteChange}>
@@ -553,7 +676,6 @@ export default function CobrosPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label htmlFor="venta">Venta Pendiente *</Label>
                   <Select onValueChange={handleVentaChange} value={ventaSeleccionada?.id || ''}>
@@ -569,7 +691,6 @@ export default function CobrosPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label htmlFor="total">Total *</Label>
                   <Input
@@ -580,10 +701,9 @@ export default function CobrosPage() {
                     required
                   />
                 </div>
-
                 <div className="space-y-4 border p-4 rounded-lg">
                   <h3 className="font-medium">Datos del Cheque (Opcional)</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="fecha_cheque">Fecha del Cheque</Label>
                       <Input
@@ -620,7 +740,6 @@ export default function CobrosPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <Label htmlFor="otros">Comentarios</Label>
                   <Input
@@ -630,7 +749,6 @@ export default function CobrosPage() {
                     placeholder="Ingrese comentarios adicionales"
                   />
                 </div>
-
                 <Button type="submit" className="w-full">Crear Cobro</Button>
               </form>
             </DialogContent>
