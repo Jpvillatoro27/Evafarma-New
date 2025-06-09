@@ -491,63 +491,114 @@ export default function VentasPage() {
 
   // Función para imprimir el ticket de la venta
   const handleImprimirVenta = async (venta: Venta) => {
-    const doc = new jsPDF({ unit: 'pt', format: [220, 350], orientation: 'portrait' })
-    let y = 24
-    // Agregar logo
+    // Calcular la altura necesaria basada en el contenido
+    const alturaBase = 400; // Altura base para el contenido mínimo
+    const alturaPorProducto = 30; // Altura estimada por cada producto
+    const alturaTotal = alturaBase + (venta.productos?.length || 0) * alturaPorProducto;
+
+    const doc = new jsPDF({
+      unit: 'pt',
+      format: [164, 500],
+      orientation: 'portrait'
+    })
+    let y = 20
     try {
       const response = await fetch('/sin-titulo.png')
       const blob = await response.blob()
       const reader = new FileReader()
       reader.onloadend = function () {
         const base64data = reader.result as string
-        doc.addImage(base64data, 'PNG', 60, y, 100, 36)
-        y += 60 // Más espacio entre logo y texto
+        doc.addImage(base64data, 'PNG', 42, y, 80, 30)
+        y += 48
         agregarContenido()
       }
       reader.readAsDataURL(blob)
     } catch (e) {
       doc.setFontSize(16)
-      doc.text('EvaFarma', 110, y, { align: 'center' })
-      y += 50
+      doc.text('EvaFarma', 82, y, { align: 'center' })
+      y += 34
       agregarContenido()
     }
+
     function agregarContenido() {
-      doc.setFontSize(16)
-      doc.text('RECIBO DE VENTA', 110, y, { align: 'center' })
-      y += 28
+      doc.setFontSize(12)
+      y += 24
       doc.setFontSize(10)
-      doc.text(`Código: ${venta.codigo}`, 16, y)
-      y += 16
-      doc.text(`Cliente: ${venta.clientes.nombre}`, 16, y)
-      y += 16
-      doc.text(`Fecha: ${new Date(venta.fecha).toLocaleDateString()}`, 16, y)
-      y += 16
-      doc.text(`Visitador: ${visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}`, 16, y)
-      y += 16
-      doc.text(`Total: Q${venta.total.toFixed(2)}`, 16, y)
-      y += 20
-      doc.setFontSize(11)
-      doc.text('Productos:', 16, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('INFORMACIÓN DE LA VENTA', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
       y += 14
+      doc.text(`No. Venta: ${venta.codigo || '-'}`, 10, y)
+      y += 14
+      doc.text(`Fecha: ${new Date(venta.fecha).toLocaleDateString()}`, 10, y)
+      y += 14
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+
       doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('INFORMACIÓN DEL CLIENTE', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
+      doc.text(`Nombre: ${venta.clientes?.nombre || 'N/D'}`, 10, y)
+      y += 12
+      const direccionLines = doc.splitTextToSize(`Dirección: ${venta.clientes?.direccion || '-'}`, 140)
+      doc.text(direccionLines, 10, y)
+      y += direccionLines.length * 12
+      const telefonoLines = doc.splitTextToSize(`Teléfono: ${venta.clientes?.telefono || '-'}`, 140)
+      doc.text(telefonoLines, 10, y)
+      y += telefonoLines.length * 12
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 10
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('DETALLE DE LA VENTA', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
       if (venta.productos && venta.productos.length > 0) {
-        venta.productos.forEach((prod, idx) => {
-          doc.text(`• ${prod.nombre} - ${prod.cantidad} x Q${prod.precio_unitario.toFixed(2)}`, 24, y)
-          y += 14
+        venta.productos.forEach((prod) => {
+          const productoLine = `${prod.nombre} - ${prod.cantidad} x Q${prod.precio_unitario.toFixed(2)} = Q${prod.total.toFixed(2)}`
+          const productoLines = doc.splitTextToSize(productoLine, 140)
+          doc.text(productoLines, 10, y)
+          y += productoLines.length * 12
         })
-      } else {
-        doc.text('Sin productos', 24, y)
-        y += 14
       }
       y += 10
-      // Línea de firma
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Total: Q${venta.total.toFixed(2)}`, 10, y)
+      doc.setFont('helvetica', 'normal')
+      y += 14
       doc.setLineWidth(0.5)
-      doc.line(16, y + 30, 204, y + 30)
+      doc.line(10, y, 154, y)
+      y += 10
+
       doc.setFontSize(10)
-      doc.text('FIRMA:', 16, y + 24)
-      y += 50
-      doc.setFontSize(9)
-      doc.text('Gracias por su compra', 110, y, { align: 'center' })
+      doc.setFont('helvetica', 'bold')
+      doc.text('VISITADOR', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 14
+      doc.text(`Visitador: ${visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}`, 10, y)
+      y += 20
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 154, y)
+      y += 20
+      doc.text('FIRMA:', 10, y)
+      y += 30
+      doc.line(10, y, 154, y)
+      y += 10
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      const nota = 'Nota: Este recibo es el único comprobante de venta que se reconoce. Por favor, conserve este documento.'
+      const notaLines = doc.splitTextToSize(nota, 140)
+      doc.text(notaLines, 82, y, { align: 'center' })
+      y += notaLines.length * 12
+      doc.text('Gracias por su compra', 82, y, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      y += 96 // 8 líneas de espacio (12pt por línea)
       doc.save(`Venta_${venta.codigo}.pdf`)
     }
   }
