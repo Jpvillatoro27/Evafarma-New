@@ -129,7 +129,7 @@ export default function HomePage() {
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-8">Bienvenido a EvaFarma</h1>
-          <p className="text-xl text-gray-600 mb-12">Sistema de gestión para visitadores médicos</p>
+          <p className="text-xl text-gray-600 mb-12">Sistema de administración para visitadores médicos</p>
         </div>
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">

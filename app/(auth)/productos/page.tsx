@@ -20,6 +20,8 @@ export default function ProductosPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showDialog, setShowDialog] = useState(false)
   const [showCargaStockDialog, setShowCargaStockDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null)
   const [filtroStock, setFiltroStock] = useState<'todos' | 'normal' | 'bajo'>('todos')
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: '',
@@ -143,6 +145,29 @@ export default function ProductosPage() {
     }
   }
 
+  const handleEditarProducto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!productoSeleccionado) return
+
+    try {
+      await productosService.updateProducto(productoSeleccionado.id, {
+        nombre: productoSeleccionado.nombre,
+        costo_produccion: productoSeleccionado.costo_produccion,
+        precio_venta: productoSeleccionado.precio_venta,
+        stock: productoSeleccionado.stock,
+        stock_minimo: productoSeleccionado.stock_minimo,
+        updated_at: new Date().toISOString()
+      })
+      toast.success('Producto actualizado exitosamente')
+      setShowEditDialog(false)
+      setProductoSeleccionado(null)
+      loadProductos()
+    } catch (error) {
+      console.error('Error al actualizar producto:', error)
+      toast.error('Error al actualizar el producto')
+    }
+  }
+
   const handleCerrarDialog = () => {
     setShowCargaStockDialog(false)
     setFormCargaStock({
@@ -154,8 +179,6 @@ export default function ProductosPage() {
   if (loading) {
     return <div>Cargando...</div>
   }
-
-  const productoSeleccionado = productos.find(p => p.id === formCargaStock.producto_id)
 
   return (
     <div className="container mx-auto p-4">
@@ -297,6 +320,82 @@ export default function ProductosPage() {
         </div>
       </div>
 
+      {/* Diálogo de edición */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Producto</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditarProducto} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-nombre">Nombre</Label>
+              <Input
+                id="edit-nombre"
+                value={productoSeleccionado?.nombre || ''}
+                onChange={(e) => setProductoSeleccionado(prev => prev ? { ...prev, nombre: e.target.value } : null)}
+                required
+              />
+            </div>
+            {isAdmin && (
+              <div>
+                <Label htmlFor="edit-costo_produccion">Costo de Producción</Label>
+                <Input
+                  id="edit-costo_produccion"
+                  type="number"
+                  step="0.01"
+                  value={productoSeleccionado?.costo_produccion || ''}
+                  onChange={(e) => setProductoSeleccionado(prev => prev ? { ...prev, costo_produccion: parseFloat(e.target.value) } : null)}
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="edit-precio_venta">Precio de Venta</Label>
+              <Input
+                id="edit-precio_venta"
+                type="number"
+                step="0.01"
+                value={productoSeleccionado?.precio_venta || ''}
+                onChange={(e) => setProductoSeleccionado(prev => prev ? { ...prev, precio_venta: parseFloat(e.target.value) } : null)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-stock">Stock</Label>
+              <Input
+                id="edit-stock"
+                type="number"
+                value={productoSeleccionado?.stock || ''}
+                onChange={(e) => setProductoSeleccionado(prev => prev ? { ...prev, stock: parseInt(e.target.value) } : null)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-stock_minimo">Stock Mínimo</Label>
+              <Input
+                id="edit-stock_minimo"
+                type="number"
+                value={productoSeleccionado?.stock_minimo || ''}
+                onChange={(e) => setProductoSeleccionado(prev => prev ? { ...prev, stock_minimo: parseInt(e.target.value) } : null)}
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setShowEditDialog(false)
+                  setProductoSeleccionado(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar Cambios</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {loading ? (
         <div>Cargando...</div>
       ) : (
@@ -311,6 +410,7 @@ export default function ProductosPage() {
                 <th className="px-4 py-2 text-right">Stock</th>
                 <th className="px-4 py-2 text-right">Stock Mínimo</th>
                 <th className="px-4 py-2 text-center">Estado</th>
+                <th className="px-4 py-2 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -332,6 +432,20 @@ export default function ProductosPage() {
                     }`}>
                       {producto.stock <= producto.stock_minimo ? 'Stock Bajo' : 'Normal'}
                     </span>
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setProductoSeleccionado(producto)
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        Editar
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
