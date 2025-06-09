@@ -186,7 +186,11 @@ export default function UsuariosPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{usuario.nombre}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{usuario.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {usuario.giras || 'Sin giras asignadas'}
+                    {usuario.giras
+                      ? usuario.giras.split(',').map((gira, idx) => (
+                          <div key={idx}>{gira.trim()}</div>
+                        ))
+                      : 'Sin giras asignadas'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <button
@@ -219,6 +223,7 @@ export default function UsuariosPage() {
                 onChange={(e) => setGiras(e.target.value)}
                 placeholder="Ingrese las giras del visitador"
               />
+              <p className="text-xs text-gray-500 mt-1">Ingrese las giras separadas por coma. Ejemplo: Huehue, Retaluleu, El Progreso</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsGirasDialogOpen(false)}>
