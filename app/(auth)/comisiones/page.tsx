@@ -41,6 +41,8 @@ interface Comision {
     }
     valor_cheque?: number
     numero_cheque?: string
+    banco?: string
+    fecha_cheque?: string
   }
 }
 
@@ -202,6 +204,13 @@ export default function ComisionesPage() {
     ? comisionesFiltradas.filter(c => getWeekKey(c.fecha_cobro, getNombreVisitador(c.visitador_id)) === semanaSeleccionada)
     : comisionesFiltradas
 
+  // Función para extraer el banco de un string de cheque
+  function extraerBancoCheque(str: string | undefined): string {
+    if (!str) return '-';
+    const match = str.match(/Banco:\s*([^\n]+)/i);
+    return match ? match[1].trim() : '-';
+  }
+
   // Modificar la función de PDF para recibir la semana seleccionada
   function generarPDFLiquidacionVisitador(semana: string) {
     const visitador = visitadores.find(v => v.id === filtroVisitador)
@@ -230,13 +239,12 @@ export default function ComisionesPage() {
     y += 20
     // Encabezados de tabla (sin % ni Comisión)
     const xFechaVenta = 40
-    const xFechaCobro = xFechaVenta + 80
-    const xCliente = xFechaCobro + 80
-    const xMonto = xCliente + 140
-    // const xPorcentaje = xMonto + 70
-    // const xComision = xPorcentaje + 50
-    const xEfectivo = xMonto + 70
-    const xCheque = xEfectivo + 100
+    const xFechaCobro = xFechaVenta + 70
+    const xCliente = xFechaCobro + 70
+    const xMonto = xCliente + 120
+    const xEfectivo = xMonto + 60
+    const xCheque = xEfectivo + 80
+    const xBanco = xCheque + 140
     doc.setFontSize(9)
     doc.text('Fecha Venta', xFechaVenta, y)
     doc.text('Fecha Cobro', xFechaCobro, y)
@@ -244,6 +252,8 @@ export default function ComisionesPage() {
     doc.text('Monto', xMonto, y)
     doc.text('Efectivo', xEfectivo, y)
     doc.text('Cheque', xCheque, y)
+    doc.text('Banco', xBanco, y)
+    doc.text('Fecha Cheque', xBanco + 60, y)
     y += 14
     let totalEfectivo = 0, totalCheque = 0, cantidadCobros = 0
     comisionesVisitador.forEach((com) => {
@@ -253,17 +263,19 @@ export default function ComisionesPage() {
       const fechaCobro = com.fecha_cobro ? format(new Date(com.fecha_cobro), 'dd/MM/yyyy') : '-'
       const valorCheque = cobro && cobro.valor_cheque ? cobro.valor_cheque : 0
       const numeroCheque = cobro && cobro.numero_cheque ? cobro.numero_cheque : '-'
+      const bancoCheque = cobro && cobro.banco ? cobro.banco : '-';
       const tieneCheque = valorCheque > 0
       const tieneEfectivo = com.monto > valorCheque
       let efectivo = 0
       if (tieneEfectivo) efectivo = com.monto - valorCheque
-      // Mostrar ambos en la misma fila
       doc.text(fechaVenta, xFechaVenta, y)
       doc.text(fechaCobro, xFechaCobro, y)
       doc.text(`${cobro?.clientes?.nombre || '-'}`, xCliente, y)
       doc.text(`Q${com.monto.toFixed(2)}`, xMonto, y)
       doc.text(tieneEfectivo ? `Q${efectivo.toFixed(2)}` : '-', xEfectivo, y)
       doc.text(tieneCheque ? `N°: ${numeroCheque}, Q${valorCheque.toFixed(2)}` : '-', xCheque, y)
+      doc.text(tieneCheque ? bancoCheque : '-', xBanco, y)
+      doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 60, y)
       totalEfectivo += efectivo
       totalCheque += valorCheque
       cantidadCobros++
@@ -324,13 +336,14 @@ export default function ComisionesPage() {
     y += 20
     // Encabezados de tabla (con % y Comisión)
     const xFechaVenta = 40
-    const xFechaCobro = xFechaVenta + 80
-    const xCliente = xFechaCobro + 80
-    const xMonto = xCliente + 140
-    const xPorcentaje = xMonto + 80
-    const xComision = xPorcentaje + 60
-    const xEfectivo = xComision + 80
-    const xCheque = xEfectivo + 100
+    const xFechaCobro = xFechaVenta + 70
+    const xCliente = xFechaCobro + 70
+    const xMonto = xCliente + 120
+    const xPorcentaje = xMonto + 60
+    const xComision = xPorcentaje + 50
+    const xEfectivo = xComision + 70
+    const xCheque = xEfectivo + 80
+    const xBanco = xCheque + 140
     doc.setFontSize(9)
     doc.text('Fecha Venta', xFechaVenta, y)
     doc.text('Fecha Cobro', xFechaCobro, y)
@@ -340,6 +353,8 @@ export default function ComisionesPage() {
     doc.text('Comisión', xComision, y)
     doc.text('Efectivo', xEfectivo, y)
     doc.text('Cheque', xCheque, y)
+    doc.text('Banco', xBanco, y)
+    doc.text('Fecha Cheque', xBanco + 60, y)
     y += 14
     let totalEfectivo = 0, totalCheque = 0, totalComision = 0, cantidadCobros = 0
     comisionesVisitador.forEach((com) => {
@@ -349,11 +364,11 @@ export default function ComisionesPage() {
       const fechaCobro = com.fecha_cobro ? format(new Date(com.fecha_cobro), 'dd/MM/yyyy') : '-'
       const valorCheque = cobro && cobro.valor_cheque ? cobro.valor_cheque : 0
       const numeroCheque = cobro && cobro.numero_cheque ? cobro.numero_cheque : '-'
+      const bancoCheque = cobro && cobro.banco ? cobro.banco : '-';
       const tieneCheque = valorCheque > 0
       const tieneEfectivo = com.monto > valorCheque
       let efectivo = 0
       if (tieneEfectivo) efectivo = com.monto - valorCheque
-      // Mostrar ambos en la misma fila
       doc.text(fechaVenta, xFechaVenta, y)
       doc.text(fechaCobro, xFechaCobro, y)
       doc.text(`${cobro?.clientes?.nombre || '-'}`, xCliente, y)
@@ -362,6 +377,8 @@ export default function ComisionesPage() {
       doc.text(`Q${(com.monto * com.porcentaje).toFixed(2)}`, xComision, y)
       doc.text(tieneEfectivo ? `Q${efectivo.toFixed(2)}` : '-', xEfectivo, y)
       doc.text(tieneCheque ? `N°: ${numeroCheque}, Q${valorCheque.toFixed(2)}` : '-', xCheque, y)
+      doc.text(tieneCheque ? bancoCheque : '-', xBanco, y)
+      doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 60, y)
       totalEfectivo += efectivo
       totalCheque += valorCheque
       totalComision += com.monto * com.porcentaje
@@ -578,19 +595,21 @@ export default function ComisionesPage() {
 
       {/* Tabla de comisiones detallada */}
       <div className="bg-white shadow-md rounded-lg overflow-x-auto mb-8">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="w-full min-w-full divide-y divide-gray-200 text-xs">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SEMANA</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FECHA VENTA</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FECHA COBRO</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENTE</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VISITADOR</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MONTO</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">%</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COMISIÓN</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EFECTIVO</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CHEQUE</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">SEMANA</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">FECHA VENTA</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">FECHA COBRO</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">CLIENTE</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">VISITADOR</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">MONTO</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">%</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">COMISIÓN</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">EFECTIVO</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">CHEQUE</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">BANCO</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">FECHA CHEQUE</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -599,32 +618,25 @@ export default function ComisionesPage() {
               const semana = getWeekKey(comision.fecha_cobro, nombreVisitador)
               const venta = comision.ventas_mensuales
               const cobro = comision.cobros
-              // Forma de pago y detalles de cheque
-              let formaPago = 'Efectivo'
-              let chequeInfo = '-'
-              if (cobro && cobro.numero_cheque && cobro.valor_cheque) {
-                formaPago = 'Cheque'
-                chequeInfo = `N°: ${cobro.numero_cheque}, Q${cobro.valor_cheque.toFixed(2)}`
-              }
               return (
-                <tr key={comision.id}>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                <tr key={comision.id} className="text-xs">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                     {formatSemana(semana)}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                     {venta && venta.fecha
                       ? format(new Date(venta.fecha), 'dd/MM/yyyy')
                       : (fechasVenta[comision.venta_id]
                         ? format(new Date(fechasVenta[comision.venta_id]), 'dd/MM/yyyy')
                         : '-')}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{format(new Date(comision.fecha_cobro), 'dd/MM/yyyy')}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cobro && cobro.clientes && cobro.clientes.nombre ? cobro.clientes.nombre : '-'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{nombreVisitador}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">Q{comision.monto.toFixed(2)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{(comision.porcentaje * 100).toFixed(0)}%</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 font-semibold">Q{(comision.monto * comision.porcentaje).toFixed(2)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{format(new Date(comision.fecha_cobro), 'dd/MM/yyyy')}</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{cobro && cobro.clientes && cobro.clientes.nombre ? cobro.clientes.nombre : '-'}</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{nombreVisitador}</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">Q{comision.monto.toFixed(2)}</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{(comision.porcentaje * 100).toFixed(0)}%</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">Q{(comision.monto * comision.porcentaje).toFixed(2)}</td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                     {(() => {
                       const cobro = comision.cobros
                       const valorCheque = cobro && cobro.valor_cheque ? cobro.valor_cheque : 0
@@ -634,7 +646,7 @@ export default function ComisionesPage() {
                       return tieneEfectivo ? `Q${efectivo.toFixed(2)}` : '-'
                     })()}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                     {(() => {
                       const cobro = comision.cobros
                       if (cobro && cobro.valor_cheque && cobro.numero_cheque) {
@@ -643,6 +655,16 @@ export default function ComisionesPage() {
                       return '-'
                     })()}
                   </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {(() => {
+                      const cobro = comision.cobros
+                      if (cobro && cobro.banco) {
+                        return cobro.banco;
+                      }
+                      return '-';
+                    })()}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-'}</td>
                 </tr>
               )
             })}
