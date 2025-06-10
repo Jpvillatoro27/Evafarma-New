@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { LocationPicker } from '@/components/LocationPicker'
-import { MapPinIcon } from '@heroicons/react/24/outline'
+import { PencilIcon } from '@heroicons/react/24/outline'
+// import { LocationPicker } from '@/components/LocationPicker'
+// import { MapPinIcon } from '@heroicons/react/24/outline'
 
 interface Cliente {
   id: string
@@ -39,7 +40,17 @@ export default function ClientesPage() {
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
-  const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
+  // const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null)
+  const [editFormData, setEditFormData] = useState({
+    nombre: '',
+    direccion: '',
+    telefono: '',
+    nit: '',
+    propietario: '',
+    Departamento: ''
+  })
 
   const [formData, setFormData] = useState({
     codigo: '',
@@ -234,6 +245,41 @@ export default function ClientesPage() {
     }
   }
 
+  const handleEditClick = (cliente: Cliente) => {
+    setEditingCliente(cliente)
+    setEditFormData({
+      nombre: cliente.nombre,
+      direccion: cliente.direccion || '',
+      telefono: cliente.telefono || '',
+      nit: cliente.nit || '',
+      propietario: cliente.propietario || '',
+      Departamento: cliente.Departamento
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCliente) return
+
+    try {
+      await clientesService.updateCliente(editingCliente.id, editFormData)
+      toast({
+        title: 'Cliente actualizado',
+        description: 'El cliente se ha actualizado correctamente'
+      })
+      setIsEditDialogOpen(false)
+      loadClientes() // Recargar la lista de clientes
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el cliente',
+        variant: 'destructive'
+      })
+    }
+  }
+
   if (loading) {
     return <div>Cargando clientes...</div>
   }
@@ -321,8 +367,20 @@ export default function ClientesPage() {
                     onChange={(e) => setFormData({ ...formData, propietario: e.target.value })}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="saldo_pendiente">Saldo Pendiente</Label>
+                  <Input
+                    id="saldo_pendiente"
+                    type="number"
+                    step="0.01"
+                    value={formData.saldo_pendiente}
+                    onChange={(e) => setFormData({ ...formData, saldo_pendiente: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
               </div>
 
+              {/* Comentado temporalmente
               <div className="space-y-2">
                 <Label>Ubicación</Label>
                 <LocationPicker
@@ -334,6 +392,7 @@ export default function ClientesPage() {
                   Haz clic en el mapa para seleccionar la ubicación del cliente
                 </p>
               </div>
+              */}
 
               <div className="flex justify-end space-x-4">
                 <Button
@@ -351,6 +410,7 @@ export default function ClientesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
       <div className="flex gap-4 mb-6">
         <Input
           placeholder="Buscar en clientes..."
@@ -376,6 +436,7 @@ export default function ClientesPage() {
           </SelectContent>
         </Select>
       </div>
+
       {clientesFiltrados.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-600">
@@ -394,6 +455,7 @@ export default function ClientesPage() {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIT</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Propietario</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departamento</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
@@ -407,15 +469,16 @@ export default function ClientesPage() {
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.nit}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.propietario}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.Departamento}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">Q{cliente.saldo_pendiente.toFixed(2)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex space-x-2">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedClienteLocation(cliente)}
-                        title="Ver ubicación"
+                        onClick={() => handleEditClick(cliente)}
+                        title="Editar cliente"
                       >
-                        <MapPinIcon className="h-5 w-5" />
+                        <PencilIcon className="h-5 w-5" />
                       </Button>
                     </div>
                   </td>
@@ -426,7 +489,98 @@ export default function ClientesPage() {
         </div>
       )}
 
-      {/* Diálogo para ver la ubicación */}
+      {/* Diálogo de edición */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nombre">Nombre *</Label>
+                <Input
+                  id="edit-nombre"
+                  value={editFormData.nombre}
+                  onChange={(e) => setEditFormData({ ...editFormData, nombre: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-direccion">Dirección</Label>
+                <Input
+                  id="edit-direccion"
+                  value={editFormData.direccion}
+                  onChange={(e) => setEditFormData({ ...editFormData, direccion: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-telefono">Teléfono</Label>
+                <Input
+                  id="edit-telefono"
+                  value={editFormData.telefono}
+                  onChange={(e) => setEditFormData({ ...editFormData, telefono: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-nit">NIT</Label>
+                <Input
+                  id="edit-nit"
+                  value={editFormData.nit}
+                  onChange={(e) => setEditFormData({ ...editFormData, nit: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-propietario">Propietario</Label>
+                <Input
+                  id="edit-propietario"
+                  value={editFormData.propietario}
+                  onChange={(e) => setEditFormData({ ...editFormData, propietario: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-Departamento">Departamento *</Label>
+                <Select
+                  value={editFormData.Departamento}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, Departamento: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((depto) => (
+                      <SelectItem key={depto.iso} value={depto.nombre}>
+                        {depto.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Guardar Cambios
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comentado temporalmente
       <Dialog open={!!selectedClienteLocation} onOpenChange={() => setSelectedClienteLocation(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -492,6 +646,7 @@ export default function ClientesPage() {
           </div>
         </DialogContent>
       </Dialog>
+      */}
     </div>
   )
 } 
