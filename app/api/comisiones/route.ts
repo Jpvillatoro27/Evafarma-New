@@ -21,7 +21,19 @@ export async function GET() {
     // Solo seleccionar de la tabla comisiones
     let { data: comisiones, error } = await supabase
       .from('comisiones')
-      .select(`*, cobros:cobro_id (id, cliente_id, clientes:cliente_id (nombre))`)
+      .select(`*, cobros:cobro_id (
+        id,
+        numero,
+        fecha,
+        visitador,
+        cliente_id,
+        banco,
+        numero_cheque,
+        fecha_cheque,
+        valor_cheque,
+        total,
+        clientes:cliente_id (nombre)
+      )`)
       .order('created_at', { ascending: false })
 
     if (error) throw error

@@ -57,6 +57,8 @@ export const clientesService = {
     propietario?: string
     saldo_pendiente?: number
     Departamento: string
+    latitud?: number
+    longitud?: number
   }) {
     try {
       const { data, error } = await supabase
@@ -78,6 +80,8 @@ export const clientesService = {
     direccion?: string
     telefono?: string
     email?: string
+    latitud?: number
+    longitud?: number
   }) {
     try {
       console.log('Actualizando cliente:', { id, ...cliente })

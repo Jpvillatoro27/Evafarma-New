@@ -6,40 +6,56 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(auth)/page": [
+    "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/page.js"
+      "static/chunks/app/login/page.js"
     ],
     "/(auth)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/layout.js"
     ],
-    "/login/page": [
+    "/(auth)/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
-    ],
-    "/(auth)/resumen-departamento/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/resumen-departamento/page.js"
-    ],
-    "/(auth)/ventas-mensuales/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/ventas-mensuales/page.js"
+      "static/chunks/app/(auth)/page.js"
     ],
     "/(auth)/ventas/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/ventas/page.js"
     ],
+    "/(auth)/productos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/productos/page.js"
+    ],
+    "/(auth)/ventas-mensuales/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/ventas-mensuales/page.js"
+    ],
     "/(auth)/cobros/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/cobros/page.js"
+    ],
+    "/(auth)/clientes/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/(auth)/clientes/page.css",
+      "static/chunks/app/(auth)/clientes/page.js"
+    ],
+    "/(auth)/comisiones/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/comisiones/page.js"
+    ],
+    "/(auth)/usuarios/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/usuarios/page.js"
     ]
   }
 }

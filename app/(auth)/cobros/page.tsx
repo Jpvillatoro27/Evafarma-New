@@ -711,13 +711,12 @@ export default function CobrosPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="total">Total *</Label>
+                  <Label htmlFor="total">Efectivo o Depósito</Label>
                   <Input
                     id="total"
                     type="number"
                     value={formData.total === 0 ? '' : formData.total}
                     onChange={(e) => setFormData({ ...formData, total: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                    required
                   />
                 </div>
                 <div className="space-y-4 border p-4 rounded-lg">

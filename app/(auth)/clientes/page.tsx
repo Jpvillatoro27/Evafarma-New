@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { LocationPicker } from '@/components/LocationPicker'
+import { MapPinIcon } from '@heroicons/react/24/outline'
 
 interface Cliente {
   id: string
@@ -22,6 +24,8 @@ interface Cliente {
   propietario?: string
   saldo_pendiente: number
   Departamento: string
+  latitud?: number
+  longitud?: number
 }
 
 export default function ClientesPage() {
@@ -35,6 +39,7 @@ export default function ClientesPage() {
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
+  const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
 
   const [formData, setFormData] = useState({
     codigo: '',
@@ -45,7 +50,9 @@ export default function ClientesPage() {
     visitador: '',
     propietario: '',
     saldo_pendiente: 0,
-    Departamento: ''
+    Departamento: '',
+    latitud: 14.6349,
+    longitud: -90.5069
   })
 
   // Lista de departamentos de Guatemala con sus códigos ISO
@@ -162,6 +169,14 @@ export default function ClientesPage() {
     }
   }
 
+  const handleLocationSelect = (location: { lat: number; lng: number }) => {
+    setFormData(prev => ({
+      ...prev,
+      latitud: location.lat,
+      longitud: location.lng
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -200,7 +215,9 @@ export default function ClientesPage() {
         visitador: user?.id || '',
         propietario: '',
         saldo_pendiente: 0,
-        Departamento: ''
+        Departamento: '',
+        latitud: 14.6349,
+        longitud: -90.5069
       })
       setIsDialogOpen(false)
       toast({
@@ -233,85 +250,103 @@ export default function ClientesPage() {
           <DialogTrigger asChild>
             <Button>Nuevo Cliente</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Cliente</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="Departamento">Departamento *</Label>
-                <Select
-                  value={formData.Departamento}
-                  onValueChange={(value) => setFormData({ ...formData, Departamento: value })}
-                  required
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="Departamento">Departamento *</Label>
+                  <Select
+                    value={formData.Departamento}
+                    onValueChange={(value) => setFormData({ ...formData, Departamento: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar departamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departamentos.map((depto) => (
+                        <SelectItem key={depto.iso} value={depto.nombre}>
+                          {depto.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nombre">Nombre *</Label>
+                  <Input
+                    id="nombre"
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="direccion">Dirección</Label>
+                  <Input
+                    id="direccion"
+                    value={formData.direccion}
+                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="telefono">Teléfono</Label>
+                  <Input
+                    id="telefono"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nit">NIT</Label>
+                  <Input
+                    id="nit"
+                    value={formData.nit}
+                    onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="propietario">Propietario</Label>
+                  <Input
+                    id="propietario"
+                    value={formData.propietario}
+                    onChange={(e) => setFormData({ ...formData, propietario: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ubicación</Label>
+                <LocationPicker
+                  onLocationSelect={handleLocationSelect}
+                  initialLocation={formData.latitud && formData.longitud ? 
+                    { lat: Number(formData.latitud), lng: Number(formData.longitud) } : undefined}
+                />
+                <p className="text-sm text-gray-500">
+                  Haz clic en el mapa para seleccionar la ubicación del cliente
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar departamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departamentos.map((depto) => (
-                      <SelectItem key={depto.nombre} value={depto.nombre}>
-                        {depto.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  Crear Cliente
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="nombre">Nombre *</Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="direccion">Dirección</Label>
-                <Input
-                  id="direccion"
-                  value={formData.direccion}
-                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="telefono">Teléfono</Label>
-                <Input
-                  id="telefono"
-                  value={formData.telefono}
-                  onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="nit">NIT</Label>
-                <Input
-                  id="nit"
-                  value={formData.nit}
-                  onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="propietario">Propietario</Label>
-                <Input
-                  id="propietario"
-                  value={formData.propietario}
-                  onChange={(e) => setFormData({ ...formData, propietario: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="saldo_pendiente">Saldo Pendiente</Label>
-                <Input
-                  id="saldo_pendiente"
-                  type="number"
-                  step="0.01"
-                  value={formData.saldo_pendiente || ''}
-                  onChange={(e) => {
-                    const value = e.target.value === '' ? 0 : parseFloat(e.target.value)
-                    setFormData({ ...formData, saldo_pendiente: value })
-                  }}
-                />
-              </div>
-              <Button type="submit" className="w-full">Crear Cliente</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -348,36 +383,41 @@ export default function ClientesPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse table-auto">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="px-4 py-2 text-left">Código</th>
-                <th className="px-4 py-2 text-left">Nombre</th>
-                <th className="px-4 py-2 text-left">Dirección</th>
-                <th className="px-4 py-2 text-left">Teléfono</th>
-                <th className="px-4 py-2 text-left">NIT</th>
-                <th className="px-4 py-2 text-left">Propietario</th>
-                <th className="px-4 py-2 text-left">Departamento</th>
-                <th className="px-4 py-2 text-right">Saldo Pendiente</th>
-                <th className="px-4 py-2 text-left">Visitador</th>
+        <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIT</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Propietario</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departamento</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {clientesFiltrados.map((cliente) => (
-                <tr key={cliente.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-2">{cliente.codigo}</td>
-                  <td className="px-4 py-2">{cliente.nombre}</td>
-                  <td className="px-4 py-2">{cliente.direccion || '-'}</td>
-                  <td className="px-4 py-2">{cliente.telefono || '-'}</td>
-                  <td className="px-4 py-2">{cliente.nit || '-'}</td>
-                  <td className="px-4 py-2">{cliente.propietario || '-'}</td>
-                  <td className="px-4 py-2">{cliente.Departamento}</td>
-                  <td className="px-4 py-2 text-right">
-                    Q{cliente.saldo_pendiente.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-2">
-                    {visitadores.find(v => v.id === cliente.visitador)?.nombre || '-'}
+                <tr key={cliente.id}>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.codigo}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.nombre}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.direccion}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.telefono}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.nit}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.propietario}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.Departamento}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedClienteLocation(cliente)}
+                        title="Ver ubicación"
+                      >
+                        <MapPinIcon className="h-5 w-5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -385,6 +425,73 @@ export default function ClientesPage() {
           </table>
         </div>
       )}
+
+      {/* Diálogo para ver la ubicación */}
+      <Dialog open={!!selectedClienteLocation} onOpenChange={() => setSelectedClienteLocation(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              Ubicación de {selectedClienteLocation?.nombre}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Ubicación</Label>
+              <LocationPicker
+                onLocationSelect={handleLocationSelect}
+                initialLocation={selectedClienteLocation?.latitud && selectedClienteLocation?.longitud ? 
+                  { lat: Number(selectedClienteLocation.latitud), lng: Number(selectedClienteLocation.longitud) } : undefined}
+                readOnly={true}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        const newLocation = {
+                          lat: position.coords.latitude,
+                          lng: position.coords.longitude
+                        }
+                        // Actualizar la ubicación del cliente
+                        clientesService.updateCliente(selectedClienteLocation?.id || '', {
+                          latitud: newLocation.lat,
+                          longitud: newLocation.lng
+                        }).then(() => {
+                          toast({
+                            title: 'Ubicación actualizada',
+                            description: 'La ubicación del cliente se ha actualizado correctamente'
+                          })
+                          // Recargar la lista de clientes
+                          loadClientes()
+                        }).catch((error) => {
+                          toast({
+                            title: 'Error',
+                            description: 'No se pudo actualizar la ubicación',
+                            variant: 'destructive'
+                          })
+                        })
+                      },
+                      (error) => {
+                        toast({
+                          title: 'Error',
+                          description: 'No se pudo obtener la ubicación actual',
+                          variant: 'destructive'
+                        })
+                      }
+                    )
+                  }
+                }}
+              >
+                Usar mi ubicación actual
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 
