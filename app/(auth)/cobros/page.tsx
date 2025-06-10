@@ -507,15 +507,32 @@ export default function CobrosPage() {
           saldoVentaNum = ventaLigada.saldo_venta
         }
       }
-      const saldoText = doc.splitTextToSize(`Saldo: Q${saldoVentaNum.toFixed(2)}`, 140)
-      doc.text(saldoText, 10, y)
-      y += saldoText.length * 12
-      const abonoText = doc.splitTextToSize(`Abono: Q${(cobro.total || 0).toFixed(2)}`, 140)
-      doc.text(abonoText, 10, y)
-      y += abonoText.length * 12
-      const saldoPendienteText = doc.splitTextToSize(`Saldo pendiente: Q${(saldoVentaNum - (cobro.total || 0)).toFixed(2)}`, 140)
-      doc.text(saldoPendienteText, 10, y)
-      y += saldoPendienteText.length * 12
+      // Lógica para mostrar los saldos según el estado del cobro
+      if (cobro.Estado === 'Confirmado') {
+        // Saldo = Saldo_venta + cobro.total
+        // Abono = cobro.total
+        // Saldo pendiente = Saldo_venta
+        const saldoText = doc.splitTextToSize(`Saldo: Q${(saldoVentaNum + (cobro.total || 0)).toFixed(2)}`, 140)
+        doc.text(saldoText, 10, y)
+        y += saldoText.length * 12
+        const abonoText = doc.splitTextToSize(`Abono: Q${(cobro.total || 0).toFixed(2)}`, 140)
+        doc.text(abonoText, 10, y)
+        y += abonoText.length * 12
+        const saldoPendienteText = doc.splitTextToSize(`Saldo pendiente: Q${saldoVentaNum.toFixed(2)}`, 140)
+        doc.text(saldoPendienteText, 10, y)
+        y += saldoPendienteText.length * 12
+      } else {
+        // Lógica original
+        const saldoText = doc.splitTextToSize(`Saldo: Q${saldoVentaNum.toFixed(2)}`, 140)
+        doc.text(saldoText, 10, y)
+        y += saldoText.length * 12
+        const abonoText = doc.splitTextToSize(`Abono: Q${(cobro.total || 0).toFixed(2)}`, 140)
+        doc.text(abonoText, 10, y)
+        y += abonoText.length * 12
+        const saldoPendienteText = doc.splitTextToSize(`Saldo pendiente: Q${(saldoVentaNum - (cobro.total || 0)).toFixed(2)}`, 140)
+        doc.text(saldoPendienteText, 10, y)
+        y += saldoPendienteText.length * 12
+      }
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
       y += 10

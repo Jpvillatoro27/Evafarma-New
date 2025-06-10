@@ -194,7 +194,14 @@ export const productosService = {
   async ajustarStock(id: string, cantidad: number, tipo: 'entrada' | 'salida') {
     try {
       // 1. Obtener el producto actual
-      const producto = await this.getProducto(id)
+      const { data: producto, error: errorProducto } = await supabase
+        .from('productos')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (errorProducto) throw errorProducto
+      if (!producto) throw new Error('Producto no encontrado')
       
       // 2. Calcular el nuevo stock
       const nuevoStock = tipo === 'entrada' 
@@ -213,22 +220,12 @@ export const productosService = {
 
       if (errorUpdate) throw errorUpdate
 
-      // 4. Registrar en el historial
-      const { error: errorHistorial } = await supabase
-        .from('historial_stock')
-        .insert([{
-          producto_id: id,
-          cantidad_anterior: producto.stock,
-          cantidad_nueva: nuevoStock,
-          tipo_movimiento: tipo,
-          usuario_id: (await supabase.auth.getUser()).data.user?.id || ''
-        }])
-
-      if (errorHistorial) throw errorHistorial
-
       return { stock: nuevoStock }
     } catch (error) {
       console.error('Error al ajustar stock:', error)
+      if (error instanceof Error) {
+        throw new Error(`Error al ajustar stock: ${error.message}`)
+      }
       throw error
     }
   },

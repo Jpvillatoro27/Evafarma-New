@@ -87,26 +87,6 @@ export default function VentasPage() {
   }, [])
 
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setVentasFiltradas(ventas)
-      return
-    }
-
-    const termino = searchTerm.toLowerCase()
-    const filtered = ventas.filter(venta => 
-      venta.clientes.nombre.toLowerCase().includes(termino) ||
-      new Date(venta.fecha).toLocaleDateString().includes(termino) ||
-      venta.total.toString().includes(termino) ||
-      venta.productos?.some(producto => 
-        producto.nombre.toLowerCase().includes(termino) ||
-        producto.cantidad.toString().includes(termino) ||
-        producto.precio_unitario.toString().includes(termino)
-      )
-    )
-    setVentasFiltradas(filtered)
-  }, [searchTerm, ventas])
-
-  useEffect(() => {
     let filtrados = ventas
 
     // Aplicar filtro por estado
@@ -114,8 +94,23 @@ export default function VentasPage() {
       filtrados = filtrados.filter(venta => venta.estado === filtroEstado)
     }
 
+    // Aplicar filtro de búsqueda
+    if (searchTerm.trim()) {
+      const termino = searchTerm.toLowerCase()
+      filtrados = filtrados.filter(venta => 
+        venta.clientes.nombre.toLowerCase().includes(termino) ||
+        new Date(venta.fecha).toLocaleDateString().includes(termino) ||
+        venta.total.toString().includes(termino) ||
+        venta.productos?.some(producto => 
+          producto.nombre.toLowerCase().includes(termino) ||
+          producto.cantidad.toString().includes(termino) ||
+          producto.precio_unitario.toString().includes(termino)
+        )
+      )
+    }
+
     setVentasFiltradas(filtrados)
-  }, [ventas, filtroEstado])
+  }, [ventas, filtroEstado, searchTerm])
 
   const loadVentas = async () => {
     try {
@@ -288,6 +283,34 @@ export default function VentasPage() {
     }
 
     try {
+      // Primero actualizar el stock de los productos
+      for (const producto of formData.productos) {
+        try {
+          await productosService.ajustarStock(
+            producto.id,
+            producto.cantidad,
+            'salida'
+          )
+        } catch (error) {
+          console.error('Error al ajustar stock:', error)
+          // Revertir los cambios de stock anteriores si hay error
+          for (const prod of formData.productos) {
+            if (prod.id === producto.id) break // No revertir el producto actual
+            try {
+              await productosService.ajustarStock(
+                prod.id,
+                prod.cantidad,
+                'entrada'
+              )
+            } catch (revertError) {
+              console.error('Error al revertir stock:', revertError)
+            }
+          }
+          throw new Error(`Error al ajustar el stock del producto ${producto.nombre}: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+        }
+      }
+
+      // Luego crear la venta
       const nuevaVenta = await ventasService.createVenta({
         cliente_id: formData.cliente_id,
         fecha: formData.fecha,
@@ -300,15 +323,6 @@ export default function VentasPage() {
         total: formData.total,
         visitador: user.id
       })
-
-      // Actualizar stock
-      for (const producto of formData.productos) {
-        await productosService.ajustarStock(
-          producto.id,
-          producto.cantidad,
-          'salida'
-        )
-      }
 
       setVentas([...ventas, nuevaVenta])
       setFormData({
@@ -323,7 +337,7 @@ export default function VentasPage() {
         description: 'La venta se ha creado correctamente'
       })
       loadVentas()
-      loadProductos() // Recargar productos para actualizar stock
+      loadProductos()
     } catch (err) {
       console.error('Error al crear venta:', err)
       toast({
@@ -383,18 +397,12 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
-      // Actualizar el estado en la base de datos
-      const { error } = await supabase
-        .from('ventas_mensuales')
-        .update({ estado: estadoSeleccionado })
-        .eq('id', ventaSeleccionada.id)
-
-      if (error) throw error
+      let nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente
 
       // Si el estado es "anulado"
       if (estadoSeleccionado === 'anulado') {
         // Restar el total del saldo pendiente del cliente
-        const nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
+        nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
         
         // Actualizar el saldo del cliente
         const { error: saldoError } = await supabase
@@ -428,31 +436,34 @@ export default function VentasPage() {
             }
           }
         }
+      }
 
-        // Actualizar la interfaz
-        setVentas(ventas.map(v => {
-          if (v.id === ventaSeleccionada.id) {
-            return {
-              ...v,
-              estado: estadoSeleccionado,
-              clientes: {
-                ...v.clientes,
-                saldo_pendiente: nuevoSaldo
-              }
+      // Actualizar el estado en la base de datos
+      const { error } = await supabase
+        .from('ventas_mensuales')
+        .update({ estado: estadoSeleccionado })
+        .eq('id', ventaSeleccionada.id)
+
+      if (error) throw error
+
+      // Actualizar la interfaz
+      setVentas(ventas.map(v => {
+        if (v.id === ventaSeleccionada.id) {
+          return {
+            ...v,
+            estado: estadoSeleccionado,
+            clientes: {
+              ...v.clientes,
+              saldo_pendiente: estadoSeleccionado === 'anulado' ? nuevoSaldo : v.clientes.saldo_pendiente
             }
           }
-          return v
-        }))
+        }
+        return v
+      }))
 
-        // Recargar los productos para actualizar el stock en la interfaz
+      // Recargar los productos para actualizar el stock en la interfaz
+      if (estadoSeleccionado === 'anulado') {
         loadProductos()
-      } else {
-        // Actualizar solo el estado si no es "anulado"
-        setVentas(ventas.map(v => 
-          v.id === ventaSeleccionada.id 
-            ? { ...v, estado: estadoSeleccionado } 
-            : v
-        ))
       }
 
       setIsEstadoDialogOpen(false)
@@ -625,7 +636,6 @@ export default function VentasPage() {
           <DialogContent 
             className="max-w-4xl"
             onPointerDownOutside={(e) => {
-              // Prevenir que el diálogo se cierre al hacer clic fuera
               e.preventDefault()
             }}
             aria-describedby="dialog-description"
@@ -839,22 +849,9 @@ export default function VentasPage() {
                   {venta.rastreo || '-'}
                 </td>
                 <td className="px-3 py-1.5">
-                  {(() => {
-                    const dias = Math.floor((new Date().getTime() - new Date(venta.fecha).getTime()) / (1000 * 60 * 60 * 24));
-                    if (dias > 120 && (venta.saldo_venta ?? 0) > 0) {
-                      return (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">
-                          El visitador debe pagar
-                        </span>
-                      );
-                    } else {
-                      return (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                          Pendiente
-                        </span>
-                      );
-                    }
-                  })()}
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${getEstadoColor(venta.estado)}`}>
+                    {venta.estado ? venta.estado.charAt(0).toUpperCase() + venta.estado.slice(1) : 'Pendiente'}
+                  </span>
                 </td>
                 <td className="px-3 py-1.5">
                   {venta.productos && venta.productos.length > 0 && (
@@ -884,8 +881,13 @@ export default function VentasPage() {
                   </button>
                   <button
                     onClick={() => handleCambiarEstado(venta)}
-                    className="p-1.5 text-green-600 hover:text-green-800 transition-colors"
-                    title="Cambiar estado de la venta"
+                    className={`p-1.5 transition-colors ${
+                      venta.estado === 'anulado' 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'text-green-600 hover:text-green-800'
+                    }`}
+                    title={venta.estado === 'anulado' ? 'No se puede cambiar el estado de una venta anulada' : 'Cambiar estado de la venta'}
+                    disabled={venta.estado === 'anulado'}
                   >
                     <CheckCircleIcon className="h-4 w-4" />
                   </button>
@@ -898,10 +900,10 @@ export default function VentasPage() {
 
       {/* Diálogo para agregar/editar rastreo */}
       <Dialog open={isRastreoDialogOpen} onOpenChange={setIsRastreoDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="rastreo-dialog-description">
           <DialogHeader>
             <DialogTitle>Agregar Guía de Rastreo</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="rastreo-dialog-description">
               Ingrese el número de guía de rastreo para la venta {ventaSeleccionada?.codigo}
             </DialogDescription>
           </DialogHeader>
@@ -924,10 +926,10 @@ export default function VentasPage() {
 
       {/* Diálogo para cambiar estado */}
       <Dialog open={isEstadoDialogOpen} onOpenChange={setIsEstadoDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="estado-dialog-description">
           <DialogHeader>
             <DialogTitle>Cambiar Estado de la Venta</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="estado-dialog-description">
               Seleccione el nuevo estado para la venta {ventaSeleccionada?.codigo}
             </DialogDescription>
           </DialogHeader>
