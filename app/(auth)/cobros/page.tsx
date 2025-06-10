@@ -715,8 +715,8 @@ export default function CobrosPage() {
                   <Input
                     id="total"
                     type="number"
-                    value={formData.total}
-                    onChange={(e) => setFormData({ ...formData, total: parseFloat(e.target.value) || 0 })}
+                    value={formData.total === 0 ? '' : formData.total}
+                    onChange={(e) => setFormData({ ...formData, total: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                     required
                   />
                 </div>
@@ -753,8 +753,8 @@ export default function CobrosPage() {
                       <Input
                         id="valor_cheque"
                         type="number"
-                        value={formData.valor_cheque}
-                        onChange={(e) => setFormData({ ...formData, valor_cheque: parseFloat(e.target.value) || 0 })}
+                        value={formData.valor_cheque === 0 ? '' : formData.valor_cheque}
+                        onChange={(e) => setFormData({ ...formData, valor_cheque: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                       />
                     </div>
                   </div>
