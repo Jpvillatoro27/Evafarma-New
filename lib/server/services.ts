@@ -34,6 +34,7 @@ export const usuariosService = {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !user) {
+        console.error('Error de autenticación:', authError)
         return null
       }
 

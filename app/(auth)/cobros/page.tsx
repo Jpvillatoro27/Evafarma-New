@@ -1,4 +1,5 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { cobrosService, clientesService, usuariosService, ventasService } from '@/lib/services'
