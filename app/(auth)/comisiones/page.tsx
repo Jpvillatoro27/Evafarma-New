@@ -38,6 +38,8 @@ interface Comision {
     clientes: {
       nombre: string
     }
+    valor_cheque?: number
+    numero_cheque?: string
   }
 }
 
