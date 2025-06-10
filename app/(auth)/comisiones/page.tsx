@@ -64,10 +64,10 @@ export default function ComisionesPage() {
   const [semanaSeleccionada, setSemanaSeleccionada] = useState<string>('')
   // Estado para filtros de mes y año de la tabla principal
   const [filtroMes, setFiltroMes] = useState<string>('todos')
-  const [filtroAnio, setFiltroAnio, setFiltroAnioResumen] = useState<string>('todos')
+  const [filtroAnio, setFiltroAnio] = useState<string>('todos')
   // Estado para filtros de mes y año del resumen por visitador
   const [filtroMesResumen, setFiltroMesResumen] = useState<string>('todos')
-  const [filtroAnioResumen] = useState<string>('todos')
+  const [filtroAnioResumen, setFiltroAnioResumen] = useState<string>('todos')
 
   useEffect(() => {
     if (user && user.rol !== 'admin') {
