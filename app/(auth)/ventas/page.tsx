@@ -723,8 +723,8 @@ export default function VentasPage() {
                         <Label>Precio Unitario</Label>
                         <Input
                           type="number"
-                          value={producto.precio_unitario}
-                          onChange={(e) => actualizarProducto(index, 'precio_unitario', e.target.value)}
+                          value={producto.precio_unitario === 0 ? '' : producto.precio_unitario}
+                          onChange={(e) => actualizarProducto(index, 'precio_unitario', e.target.value === '' ? 0 : e.target.value)}
                           min="0"
                           step="0.01"
                         />
@@ -733,9 +733,9 @@ export default function VentasPage() {
                         <Label>Cantidad</Label>
                         <Input
                           type="number"
-                          value={producto.cantidad}
+                          value={producto.cantidad === 0 ? '' : producto.cantidad}
                           onChange={(e) => {
-                            const cantidad = Number(e.target.value)
+                            const cantidad = e.target.value === '' ? 0 : Number(e.target.value)
                             if (cantidad > producto.stock_disponible) {
                               toast({
                                 title: 'Error',
@@ -754,7 +754,7 @@ export default function VentasPage() {
                         <Label>Total</Label>
                         <Input
                           type="number"
-                          value={producto.total}
+                          value={producto.total === 0 ? '' : producto.total}
                           readOnly
                         />
                       </div>
