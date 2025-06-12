@@ -73,6 +73,7 @@ export default function ComisionesPage() {
   // Estado para filtros de mes y año del resumen por visitador
   const [filtroMesResumen, setFiltroMesResumen] = useState<string>('todos')
   const [filtroAnioResumen, setFiltroAnioResumen] = useState<string>('todos')
+  const [visitadoresError, setVisitadoresError] = useState<string | null>(null)
 
   useEffect(() => {
     if (user && user.rol !== 'admin') {
@@ -107,9 +108,11 @@ export default function ComisionesPage() {
 
   const loadVisitadores = async () => {
     try {
+      setVisitadoresError(null)
       const data = await usuariosService.getVisitadores()
       setVisitadores(data)
     } catch (error) {
+      setVisitadoresError('Error al cargar visitadores. Intenta de nuevo.')
       console.error('Error al cargar visitadores:', error)
     }
   }
@@ -157,7 +160,7 @@ export default function ComisionesPage() {
 
   const getNombreVisitador = (visitadorId: string) => {
     const visitadorObj = visitadores.find(v => v.id === visitadorId)
-    return visitadorObj?.nombre || visitadorId || 'Sin nombre'
+    return visitadorObj?.nombre || 'Cargando...'
   }
 
   // Agrupar comisiones por semana y visitador
@@ -498,12 +501,23 @@ export default function ComisionesPage() {
     return `${inicioFmt} a ${finFmt}${rest.length ? ' - ' + rest.join(' - ') : ''}`
   }
 
-  if (loading) {
+  if (loading || visitadores.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando comisiones...</p>
+          <p className="mt-4 text-gray-600">Cargando datos...</p>
+          {visitadoresError && (
+            <>
+              <p className="text-red-500 mt-2">{visitadoresError}</p>
+              <button
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={loadVisitadores}
+              >
+                Reintentar
+              </button>
+            </>
+          )}
         </div>
       </div>
     )
