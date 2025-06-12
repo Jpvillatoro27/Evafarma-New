@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { Producto } from '@/types'
 import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { jsPDF } from 'jspdf'
+import { format } from 'date-fns'
 
 interface ProductoVenta {
   id: string
@@ -112,6 +113,23 @@ export default function VentasPage() {
 
     setVentasFiltradas(filtrados)
   }, [ventas, filtroEstado, searchTerm])
+
+  useEffect(() => {
+    // Si alguna venta tiene saldo_venta 0 y no está completada, actualizar su estado automáticamente
+    ventas.forEach(async (venta) => {
+      if (venta.saldo_venta === 0 && venta.estado !== 'completado') {
+        try {
+          await supabase
+            .from('ventas_mensuales')
+            .update({ estado: 'completado' })
+            .eq('id', venta.id)
+          setVentas((prev) => prev.map(v => v.id === venta.id ? { ...v, estado: 'completado' } : v))
+        } catch (error) {
+          console.error('Error al actualizar estado a completado:', error)
+        }
+      }
+    })
+  }, [ventas])
 
   const loadVentas = async () => {
     try {
@@ -359,9 +377,13 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
+      const updates: any = { rastreo }
+      if (rastreo && rastreo.trim() !== '') {
+        updates.estado = 'enviado'
+      }
       const { error } = await supabase
         .from('ventas_mensuales')
-        .update({ rastreo })
+        .update(updates)
         .eq('id', ventaSeleccionada.id)
 
       if (error) throw error
@@ -369,7 +391,7 @@ export default function VentasPage() {
       // Actualizar el estado local
       setVentas(ventas.map(v => 
         v.id === ventaSeleccionada.id 
-          ? { ...v, rastreo } 
+          ? { ...v, rastreo, estado: updates.estado ? 'enviado' : v.estado } 
           : v
       ))
 
@@ -542,7 +564,7 @@ export default function VentasPage() {
       y += 14
       doc.text(`No. Venta: ${venta.codigo || '-'}`, 10, y)
       y += 14
-      doc.text(`Fecha: ${new Date(venta.fecha).toLocaleDateString()}`, 10, y)
+      doc.text(`Fecha: ${format(new Date(venta.fecha), 'dd/MM/yyyy')}`, 10, y)
       y += 14
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
@@ -832,7 +854,7 @@ export default function VentasPage() {
                 <td className="px-3 py-1.5">{venta.codigo}</td>
                 <td className="px-3 py-1.5">{venta.clientes.nombre}</td>
                 <td className="px-3 py-1.5">
-                  {new Date(venta.fecha).toLocaleDateString()}
+                  {format(new Date(venta.fecha), 'dd/MM/yyyy')}
                 </td>
                 <td className="px-3 py-1.5">
                   {visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}

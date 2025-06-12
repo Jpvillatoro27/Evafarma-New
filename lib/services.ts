@@ -216,9 +216,13 @@ export const cobrosService = {
     otros3?: string
   }) {
     try {
+      // Sumar un día a la fecha
+      const fechaOriginal = new Date(cobroData.fecha)
+      fechaOriginal.setDate(fechaOriginal.getDate() + 1)
+      const fechaAjustada = fechaOriginal.toISOString().split('T')[0]
       const { data, error } = await supabase
         .from('cobros')
-        .insert([{ ...cobroData, Estado: 'Pendiente' }])
+        .insert([{ ...cobroData, fecha: fechaAjustada, Estado: 'Pendiente' }])
         .select()
         .single()
 
@@ -502,13 +506,22 @@ export const ventasService = {
     try {
       // Obtener el código
       const codigo = await this.getUltimoCodigoVenta()
-
+      // Sumar un día a la fecha (formato DD/MM/AAAA)
+      let fechaOriginal: Date
+      if (/\d{2}\/\d{2}\/\d{4}/.test(ventaData.fecha)) {
+        const [dia, mes, anio] = ventaData.fecha.split('/')
+        fechaOriginal = new Date(Number(anio), Number(mes) - 1, Number(dia))
+      } else {
+        fechaOriginal = new Date(ventaData.fecha)
+      }
+      fechaOriginal.setDate(fechaOriginal.getDate() + 1)
+      const fechaAjustada = fechaOriginal.toISOString().split('T')[0]
       // 1. Crear la venta
       const { data: venta, error: ventaError } = await supabase
         .from('ventas_mensuales')
         .insert([{
           codigo,
-          fecha: ventaData.fecha,
+          fecha: fechaAjustada,
           cliente_id: ventaData.cliente_id,
           visitador: ventaData.visitador,
           total: ventaData.total,

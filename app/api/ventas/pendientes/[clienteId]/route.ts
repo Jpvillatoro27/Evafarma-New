@@ -15,8 +15,9 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('ventas_mensuales')
-      .select('id, codigo, fecha, total, saldo_venta')
+      .select('id, codigo, fecha, total, saldo_venta, estado')
       .eq('cliente_id', params.clienteId)
+      .in('estado', ['pendiente', 'enviado'])
       .gt('saldo_venta', 0)
       .order('fecha', { ascending: false })
 

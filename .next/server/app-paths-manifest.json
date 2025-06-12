@@ -1,21 +1,5 @@
 {
-  "/_not-found": "app/_not-found.js",
-  "/api/ventas/pendientes/venta/[ventaId]/route": "app/api/ventas/pendientes/venta/[ventaId]/route.js",
-  "/api/comisiones/[id]/confirmar/route": "app/api/comisiones/[id]/confirmar/route.js",
-  "/api/ventas/pendientes/[clienteId]/route": "app/api/ventas/pendientes/[clienteId]/route.js",
-  "/login/page": "app/login/page.js",
-  "/api/ventas/todas/venta/[ventaId]/route": "app/api/ventas/todas/venta/[ventaId]/route.js",
-  "/register/page": "app/register/page.js",
-  "/test-connection/page": "app/test-connection/page.js",
-  "/api/auth/user/route": "app/api/auth/user/route.js",
-  "/api/comisiones/route": "app/api/comisiones/route.js",
-  "/(auth)/clientes/page": "app/(auth)/clientes/page.js",
-  "/(auth)/usuarios/page": "app/(auth)/usuarios/page.js",
-  "/(auth)/comisiones/page": "app/(auth)/comisiones/page.js",
-  "/(auth)/resumen-departamento/page": "app/(auth)/resumen-departamento/page.js",
-  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
-  "/(auth)/ventas/page": "app/(auth)/ventas/page.js",
   "/(auth)/page": "app/(auth)/page.js",
-  "/(auth)/productos/page": "app/(auth)/productos/page.js",
-  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js"
+  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
+  "/(auth)/ventas/page": "app/(auth)/ventas/page.js"
 }
