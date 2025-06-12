@@ -3,6 +3,8 @@ import { usuariosService } from '@/lib/server/services'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     // Obtener usuario actual usando el servicio común

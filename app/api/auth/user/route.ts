@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { usuariosService } from '@/lib/server/services'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const usuario = await usuariosService.getUsuarioActual()
