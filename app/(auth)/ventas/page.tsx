@@ -64,6 +64,7 @@ export default function VentasPage() {
   const [clientes, setClientes] = useState<any[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [visitadores, setVisitadores] = useState<{ id: string; nombre: string }[]>([])
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([])
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -86,6 +87,7 @@ export default function VentasPage() {
     loadClientes()
     loadProductos()
     loadVisitadores()
+    loadUsuarios()
   }, [])
 
   useEffect(() => {
@@ -199,6 +201,15 @@ export default function VentasPage() {
       setVisitadores(data)
     } catch (error) {
       console.error('Error al cargar visitadores:', error)
+    }
+  }
+
+  const loadUsuarios = async () => {
+    try {
+      const data = await usuariosService.getUsuarios()
+      setUsuarios(data)
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error)
     }
   }
 
@@ -614,7 +625,12 @@ export default function VentasPage() {
       doc.text('VISITADOR', 82, y, { align: 'center' })
       doc.setFont('helvetica', 'normal')
       y += 14
-      doc.text(`Visitador: ${visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}`, 10, y)
+      doc.text(`Visitador: ${(() => {
+        const visitadorObj = visitadores.find(v => v.id === venta.visitador)
+        if (visitadorObj) return visitadorObj.nombre
+        const usuarioObj = usuarios.find(u => u.id === venta.visitador)
+        return usuarioObj?.nombre || 'N/A'
+      })()}`, 10, y)
       y += 20
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
@@ -857,7 +873,12 @@ export default function VentasPage() {
                   {format(new Date(venta.fecha), 'dd/MM/yyyy')}
                 </td>
                 <td className="px-3 py-1.5">
-                  {visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}
+                  {(() => {
+                    const visitadorObj = visitadores.find(v => v.id === venta.visitador)
+                    if (visitadorObj) return visitadorObj.nombre
+                    const usuarioObj = usuarios.find(u => u.id === venta.visitador)
+                    return usuarioObj?.nombre || 'N/A'
+                  })()}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   Q{venta.total.toFixed(2)}

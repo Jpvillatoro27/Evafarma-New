@@ -775,5 +775,20 @@ export const usuariosService = {
       console.error('Error al actualizar usuario:', error)
       throw error
     }
+  },
+
+  async getUsuarios() {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nombre, email, rol')
+        .order('nombre')
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al obtener usuarios:', error)
+      throw error
+    }
   }
 } 

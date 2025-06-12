@@ -74,6 +74,7 @@ export default function ComisionesPage() {
   const [filtroMesResumen, setFiltroMesResumen] = useState<string>('todos')
   const [filtroAnioResumen, setFiltroAnioResumen] = useState<string>('todos')
   const [visitadoresError, setVisitadoresError] = useState<string | null>(null)
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([])
 
   useEffect(() => {
     if (user && user.rol !== 'admin') {
@@ -83,6 +84,7 @@ export default function ComisionesPage() {
     }
     loadComisiones()
     loadVisitadores()
+    loadUsuarios()
   }, [user])
 
   const loadComisiones = async () => {
@@ -114,6 +116,15 @@ export default function ComisionesPage() {
     } catch (error) {
       setVisitadoresError('Error al cargar visitadores. Intenta de nuevo.')
       console.error('Error al cargar visitadores:', error)
+    }
+  }
+
+  const loadUsuarios = async () => {
+    try {
+      const data = await usuariosService.getUsuarios()
+      setUsuarios(data)
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error)
     }
   }
 
@@ -161,13 +172,8 @@ export default function ComisionesPage() {
   const getNombreVisitador = (visitadorId: string) => {
     const visitadorObj = visitadores.find(v => v.id === visitadorId)
     if (visitadorObj) return visitadorObj.nombre
-    
-    // Si no es visitador, es admin
-    if (user && user.rol === 'admin') {
-      return user.nombre || 'Administrador'
-    }
-    
-    return '-'
+    const usuarioObj = usuarios.find(u => u.id === visitadorId)
+    return usuarioObj?.nombre || '-'
   }
 
   // Agrupar comisiones por semana y visitador

@@ -96,6 +96,7 @@ export default function CobrosPage() {
   const [ventasPendientes, setVentasPendientes] = useState<VentaPendiente[]>([])
   const [ventaSeleccionada, setVentaSeleccionada] = useState<VentaPendiente | null>(null)
   const [ventas, setVentas] = useState<any[]>([])
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([])
 
   useEffect(() => {
     if (user?.id) {
@@ -197,10 +198,20 @@ export default function CobrosPage() {
     }
   }
 
+  const loadUsuarios = async () => {
+    try {
+      const data = await usuariosService.getUsuarios()
+      setUsuarios(data)
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error)
+    }
+  }
+
   useEffect(() => {
     loadCobros()
     loadClientes()
     loadVisitadores()
+    loadUsuarios()
   }, [])
 
   useEffect(() => {
@@ -816,7 +827,9 @@ export default function CobrosPage() {
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                       {(() => {
                         const visitadorObj = visitadores.find(v => v.id === cobro.visitador)
-                        return visitadorObj?.nombre || 'Sin nombre'
+                        if (visitadorObj) return visitadorObj.nombre
+                        const usuarioObj = usuarios.find(u => u.id === cobro.visitador)
+                        return usuarioObj?.nombre || 'Sin nombre'
                       })()}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
