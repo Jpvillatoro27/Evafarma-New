@@ -160,7 +160,14 @@ export default function ComisionesPage() {
 
   const getNombreVisitador = (visitadorId: string) => {
     const visitadorObj = visitadores.find(v => v.id === visitadorId)
-    return visitadorObj?.nombre || 'Cargando...'
+    if (visitadorObj) return visitadorObj.nombre
+    
+    // Si no es visitador, es admin
+    if (user && user.rol === 'admin') {
+      return user.nombre || 'Administrador'
+    }
+    
+    return '-'
   }
 
   // Agrupar comisiones por semana y visitador
@@ -501,7 +508,7 @@ export default function ComisionesPage() {
     return `${inicioFmt} a ${finFmt}${rest.length ? ' - ' + rest.join(' - ') : ''}`
   }
 
-  if (loading || visitadores.length === 0) {
+  if (loading && user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
