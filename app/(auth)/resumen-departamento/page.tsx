@@ -58,17 +58,19 @@ export default function ResumenDepartamentoPage() {
         ])
         const clientesMap = new Map<string, any>()
         clientes.forEach((c: any) => clientesMap.set(c.id, c))
-        const ventasDet: VentaDetalle[] = ventas.map((venta: any) => {
-          const cliente = clientesMap.get(venta.cliente_id)
-          const departamento = cliente?.Departamento || 'Sin departamento'
-          return {
-            id: venta.id,
-            fecha: venta.fecha,
-            cliente: cliente?.nombre || 'Sin cliente',
-            departamento,
-            total: venta.total
-          }
-        })
+        const ventasDet: VentaDetalle[] = ventas
+          .filter((venta: any) => venta.estado !== 'anulado')
+          .map((venta: any) => {
+            const cliente = clientesMap.get(venta.cliente_id)
+            const departamento = cliente?.Departamento || 'Sin departamento'
+            return {
+              id: venta.id,
+              fecha: venta.fecha,
+              cliente: cliente?.nombre || 'Sin cliente',
+              departamento,
+              total: venta.total
+            }
+          })
         setTodasLasVentas(ventasDet)
         setMesesSeleccionados([]) // Por defecto, sin filtro
       } catch (err) {
