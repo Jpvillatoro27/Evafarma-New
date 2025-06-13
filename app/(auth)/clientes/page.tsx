@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PencilIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, MapPinIcon } from '@heroicons/react/24/outline'
+import { LocationPicker } from '@/components/LocationPicker'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 // import { LocationPicker } from '@/components/LocationPicker'
 // import { MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -41,7 +43,7 @@ export default function ClientesPage() {
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
-  // const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
+  const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null)
   const [editFormData, setEditFormData] = useState({
@@ -50,7 +52,10 @@ export default function ClientesPage() {
     telefono: '',
     nit: '',
     propietario: '',
-    Departamento: ''
+    Departamento: '',
+    latitud: 14.6349,
+    longitud: -90.5069,
+    saldo_pendiente: ''
   })
 
   const [formData, setFormData] = useState({
@@ -61,7 +66,7 @@ export default function ClientesPage() {
     nit: '',
     visitador: '',
     propietario: '',
-    saldo_pendiente: 0,
+    saldo_pendiente: '',
     Departamento: '',
     latitud: 14.6349,
     longitud: -90.5069
@@ -189,6 +194,31 @@ export default function ClientesPage() {
     }))
   }
 
+  const handleUseCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          }
+          handleLocationSelect(newLocation)
+          toast({
+            title: 'Ubicación actualizada',
+            description: 'Se ha actualizado la ubicación con tu posición actual'
+          })
+        },
+        (error) => {
+          toast({
+            title: 'Error',
+            description: 'No se pudo obtener tu ubicación actual',
+            variant: 'destructive'
+          })
+        }
+      )
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -215,7 +245,8 @@ export default function ClientesPage() {
 
       const nuevoCliente = await clientesService.createCliente({
         ...formData,
-        codigo
+        codigo,
+        saldo_pendiente: formData.saldo_pendiente === '' ? 0 : parseFloat(formData.saldo_pendiente)
       })
       setClientes([...clientes, nuevoCliente])
       setFormData({
@@ -226,7 +257,7 @@ export default function ClientesPage() {
         nit: '',
         visitador: user?.id || '',
         propietario: '',
-        saldo_pendiente: 0,
+        saldo_pendiente: '',
         Departamento: '',
         latitud: 14.6349,
         longitud: -90.5069
@@ -254,9 +285,20 @@ export default function ClientesPage() {
       telefono: cliente.telefono || '',
       nit: cliente.nit || '',
       propietario: cliente.propietario || '',
-      Departamento: cliente.Departamento
+      Departamento: cliente.Departamento,
+      latitud: cliente.latitud || 14.6349,
+      longitud: cliente.longitud || -90.5069,
+      saldo_pendiente: cliente.saldo_pendiente.toString()
     })
     setIsEditDialogOpen(true)
+  }
+
+  const handleEditLocationSelect = (location: { lat: number; lng: number }) => {
+    setEditFormData(prev => ({
+      ...prev,
+      latitud: location.lat,
+      longitud: location.lng
+    }))
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -264,7 +306,10 @@ export default function ClientesPage() {
     if (!editingCliente) return
 
     try {
-      await clientesService.updateCliente(editingCliente.id, editFormData)
+      await clientesService.updateCliente(editingCliente.id, {
+        ...editFormData,
+        saldo_pendiente: editFormData.saldo_pendiente === '' ? 0 : parseFloat(editFormData.saldo_pendiente)
+      })
       toast({
         title: 'Cliente actualizado',
         description: 'El cliente se ha actualizado correctamente'
@@ -374,14 +419,12 @@ export default function ClientesPage() {
                   <Input
                     id="saldo_pendiente"
                     type="number"
-                    step="0.01"
                     value={formData.saldo_pendiente}
-                    onChange={(e) => setFormData({ ...formData, saldo_pendiente: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, saldo_pendiente: e.target.value })}
                   />
                 </div>
               </div>
 
-              {/* Comentado temporalmente
               <div className="space-y-2">
                 <Label>Ubicación</Label>
                 <LocationPicker
@@ -389,11 +432,19 @@ export default function ClientesPage() {
                   initialLocation={formData.latitud && formData.longitud ? 
                     { lat: Number(formData.latitud), lng: Number(formData.longitud) } : undefined}
                 />
+                <div className="flex justify-end mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUseCurrentLocation}
+                  >
+                    Usar mi ubicación actual
+                  </Button>
+                </div>
                 <p className="text-sm text-gray-500">
                   Haz clic en el mapa para seleccionar la ubicación del cliente
                 </p>
               </div>
-              */}
 
               <div className="flex justify-end space-x-4">
                 <Button
@@ -473,14 +524,41 @@ export default function ClientesPage() {
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">Q{cliente.saldo_pendiente.toFixed(2)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClick(cliente)}
-                        title="Editar cliente"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(cliente)}
+                              title="Editar cliente"
+                            >
+                              <PencilIcon className="h-5 w-5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Editar cliente</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedClienteLocation(cliente)}
+                              title="Ver ubicación"
+                            >
+                              <MapPinIcon className="h-5 w-5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Ver ubicación</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </td>
                 </tr>
@@ -563,6 +641,27 @@ export default function ClientesPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>Ubicación</Label>
+                <LocationPicker
+                  onLocationSelect={handleEditLocationSelect}
+                  initialLocation={editFormData.latitud && editFormData.longitud ? 
+                    { lat: Number(editFormData.latitud), lng: Number(editFormData.longitud) } : undefined}
+                />
+                <div className="flex justify-end mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUseCurrentLocation}
+                  >
+                    Usar mi ubicación actual
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Haz clic en el mapa para seleccionar la ubicación del cliente
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-4">
@@ -581,7 +680,7 @@ export default function ClientesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Comentado temporalmente
+      {/* Diálogo de ubicación */}
       <Dialog open={!!selectedClienteLocation} onOpenChange={() => setSelectedClienteLocation(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -604,50 +703,20 @@ export default function ClientesPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        const newLocation = {
-                          lat: position.coords.latitude,
-                          lng: position.coords.longitude
-                        }
-                        // Actualizar la ubicación del cliente
-                        clientesService.updateCliente(selectedClienteLocation?.id || '', {
-                          latitud: newLocation.lat,
-                          longitud: newLocation.lng
-                        }).then(() => {
-                          toast({
-                            title: 'Ubicación actualizada',
-                            description: 'La ubicación del cliente se ha actualizado correctamente'
-                          })
-                          // Recargar la lista de clientes
-                          loadClientes()
-                        }).catch((error) => {
-                          toast({
-                            title: 'Error',
-                            description: 'No se pudo actualizar la ubicación',
-                            variant: 'destructive'
-                          })
-                        })
-                      },
-                      (error) => {
-                        toast({
-                          title: 'Error',
-                          description: 'No se pudo obtener la ubicación actual',
-                          variant: 'destructive'
-                        })
-                      }
+                  if (selectedClienteLocation?.latitud && selectedClienteLocation?.longitud) {
+                    window.open(
+                      `https://www.google.com/maps?q=${selectedClienteLocation.latitud},${selectedClienteLocation.longitud}`,
+                      '_blank'
                     )
                   }
                 }}
               >
-                Usar mi ubicación actual
+                Abrir en Google Maps
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-      */}
     </div>
   )
 } 

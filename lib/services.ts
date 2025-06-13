@@ -82,6 +82,10 @@ export const clientesService = {
     email?: string
     latitud?: number
     longitud?: number
+    saldo_pendiente?: number
+    propietario?: string
+    nit?: string
+    Departamento?: string
   }) {
     try {
       console.log('Actualizando cliente:', { id, ...cliente })
