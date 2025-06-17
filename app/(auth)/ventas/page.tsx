@@ -104,8 +104,6 @@ export default function VentasPage() {
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'anulado'>('pendiente')
   const [isEstadoDialogOpen, setIsEstadoDialogOpen] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
-  const [filtroMes, setFiltroMes] = useState<string>('todos')
-  const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
 
   useEffect(() => {
     loadVentas()
@@ -121,20 +119,6 @@ export default function VentasPage() {
     // Aplicar filtro por estado
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(venta => venta.estado === filtroEstado)
-    }
-
-    // Aplicar filtro por visitador
-    if (filtroVisitador !== 'todos') {
-      filtrados = filtrados.filter(venta => venta.visitador === filtroVisitador)
-    }
-
-    // Aplicar filtro por mes y año
-    if (filtroMes !== 'todos') {
-      const [mes, año] = filtroMes.split('-')
-      filtrados = filtrados.filter(venta => {
-        const fecha = new Date(venta.fecha)
-        return fecha.getMonth() + 1 === parseInt(mes) && fecha.getFullYear() === parseInt(año)
-      })
     }
 
     // Aplicar filtro de búsqueda
@@ -153,7 +137,7 @@ export default function VentasPage() {
     }
 
     setVentasFiltradas(filtrados)
-  }, [ventas, filtroEstado, filtroVisitador, searchTerm, filtroMes])
+  }, [ventas, filtroEstado, searchTerm])
 
   const loadVentas = async () => {
     try {
@@ -175,21 +159,6 @@ export default function VentasPage() {
           productos: venta.productos || []
         } as Venta
       })
-
-      // Verificar y actualizar estados basados en saldo_venta
-      for (const venta of ventasFormateadas) {
-        if (venta.saldo_venta === 0 && venta.estado !== 'completado') {
-          const { error } = await supabase
-            .from('ventas_mensuales')
-            .update({ estado: 'completado' })
-            .eq('id', venta.id)
-
-          if (!error) {
-            venta.estado = 'completado'
-          }
-        }
-      }
-
       setVentas(ventasFormateadas)
     } catch (error) {
       console.error('Error al cargar ventas:', error)
@@ -469,16 +438,61 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
+      let nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente
+
+      // Si el estado es "anulado"
+      if (estadoSeleccionado === 'anulado') {
+        // Restar el total del saldo pendiente del cliente
+        nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
+        
+        // Actualizar el saldo del cliente
+        const { error: saldoError } = await supabase
+          .from('clientes')
+          .update({ saldo_pendiente: nuevoSaldo })
+          .eq('id', ventaSeleccionada.cliente_id)
+
+        if (saldoError) throw saldoError
+
+        // Actualizar el stock de cada producto
+        if (ventaSeleccionada.productos) {
+          for (const producto of ventaSeleccionada.productos) {
+            // Obtener el stock actual
+            const { data: productoActual } = await supabase
+              .from('productos')
+              .select('stock')
+              .eq('id', producto.id)
+              .single()
+
+            if (productoActual) {
+              // Calcular el nuevo stock sumando la cantidad vendida
+              const nuevoStock = productoActual.stock + producto.cantidad
+
+              // Actualizar el stock en la base de datos
+              const { error: stockError } = await supabase
+                .from('productos')
+                .update({ stock: nuevoStock })
+                .eq('id', producto.id)
+
+              if (stockError) throw stockError
+            }
+          }
+        }
+      }
+
+      const estadoFinal = ventaSeleccionada.saldo_venta === 0 ? 'completado' : estadoSeleccionado
+
       const { error } = await supabase
         .from('ventas_mensuales')
-        .update({ estado: estadoSeleccionado })
+        .update({ estado: estadoFinal })
         .eq('id', ventaSeleccionada.id)
 
       if (error) throw error
 
       toast({
         title: 'Estado actualizado',
-        description: `La venta ahora está ${estadoSeleccionado}`,
+        description: estadoFinal === 'anulado' 
+          ? 'La venta ha sido anulada, el saldo del cliente y el stock han sido actualizados'
+          : `La venta ahora está ${estadoFinal}`,
       })
 
       setIsEstadoDialogOpen(false)
@@ -829,21 +843,6 @@ export default function VentasPage() {
     }
   }
 
-  // Obtener los meses y años únicos de las ventas
-  const mesesDisponibles = Array.from(
-    new Set(
-      ventas.map(venta => {
-        const fecha = new Date(venta.fecha)
-        return `${fecha.getMonth() + 1}-${fecha.getFullYear()}`
-      })
-    )
-  )
-    .map(key => {
-      const [mes, año] = key.split('-')
-      return { mes: parseInt(mes), año: parseInt(año) }
-    })
-    .sort((a, b) => b.año !== a.año ? b.año - a.año : b.mes - a.mes)
-
   if (loading) {
     return <div>Cargando ventas...</div>
   }
@@ -1026,68 +1025,26 @@ export default function VentasPage() {
         </Dialog>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex-1 min-w-[200px]">
-          <Input
-            type="search"
-            placeholder="Buscar ventas..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <div className="w-[200px]">
-          <Select
+      <div className="mb-6 flex gap-4 items-center">
+        <Input
+          placeholder="Buscar en ventas..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Filtrar por estado:</span>
+          <select
             value={filtroEstado}
-            onValueChange={setFiltroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="text-sm border rounded p-1.5 bg-white"
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los estados</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
-              <SelectItem value="enviado">Enviado</SelectItem>
-              <SelectItem value="completado">Completado</SelectItem>
-              <SelectItem value="anulado">Anulado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-[200px]">
-          <Select
-            value={filtroMes}
-            onValueChange={setFiltroMes}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por mes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los meses</SelectItem>
-              {mesesDisponibles.map(({ mes, año }) => (
-                <SelectItem key={`${mes}-${año}`} value={`${mes}-${año}`}>
-                  {new Date(año, mes - 1, 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-[200px]">
-          <Select
-            value={filtroVisitador}
-            onValueChange={setFiltroVisitador}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por visitador" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los visitadores</SelectItem>
-              {visitadores.map((visitador) => (
-                <SelectItem key={visitador.id} value={visitador.id}>
-                  {visitador.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <option value="todos">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="enviado">Enviado</option>
+            <option value="completado">Completado</option>
+            <option value="anulado">Anulado</option>
+          </select>
         </div>
       </div>
 
