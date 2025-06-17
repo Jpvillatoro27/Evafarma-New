@@ -460,6 +460,7 @@ export const ventasService = {
           estado,
           rastreo,
           saldo_venta,
+          comentario,
           clientes:cliente_id (
             id,
             codigo,
@@ -500,6 +501,7 @@ export const ventasService = {
     cliente_id: string
     visitador: string
     total: number
+    comentario?: string
     productos: Array<{
       nombre: string
       cantidad: number
@@ -530,7 +532,8 @@ export const ventasService = {
           visitador: ventaData.visitador,
           total: ventaData.total,
           saldo_venta: ventaData.total,
-          estado: 'pendiente' // Estado por defecto
+          estado: 'pendiente', // Estado por defecto
+          comentario: ventaData.comentario || null
         }])
         .select()
         .single()

@@ -72,6 +72,7 @@ export interface VentaMensual {
   visitador: string
   total: number
   productos: ProductoVenta[]
+  comentario?: string
 }
 
 export interface ProductoVenta {

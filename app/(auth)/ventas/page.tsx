@@ -13,9 +13,17 @@ import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { Producto } from '@/types'
-import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TruckIcon, CheckCircleIcon, PrinterIcon, TableCellsIcon } from '@heroicons/react/24/outline'
 import { jsPDF } from 'jspdf'
 import { format } from 'date-fns'
+import * as XLSX from 'xlsx-js-style'
+
+interface Usuario {
+  id: string
+  email: string
+  nombre: string
+  rol: string
+}
 
 interface ProductoVenta {
   id: string
@@ -24,6 +32,17 @@ interface ProductoVenta {
   precio_unitario: number
   total: number
   stock_disponible: number
+}
+
+interface Cliente {
+  id: string
+  codigo: string
+  nombre: string
+  direccion?: string
+  telefono?: string
+  nit?: string
+  propietario?: string
+  saldo_pendiente: number
 }
 
 interface Venta {
@@ -39,10 +58,12 @@ interface Venta {
   saldo_venta?: number
   clientes: {
     id: string
+    codigo: string
     nombre: string
     direccion?: string
     telefono?: string
     nit?: string
+    propietario?: string
     saldo_pendiente: number
   }
   productos?: Array<{
@@ -52,6 +73,7 @@ interface Venta {
     precio_unitario: number
     total: number
   }>
+  comentario?: string
 }
 
 export default function VentasPage() {
@@ -64,7 +86,7 @@ export default function VentasPage() {
   const [clientes, setClientes] = useState<any[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [visitadores, setVisitadores] = useState<{ id: string; nombre: string }[]>([])
-  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([])
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -72,15 +94,18 @@ export default function VentasPage() {
     cliente_id: '',
     fecha: new Date().toISOString().split('T')[0],
     productos: [{ id: '', nombre: '', cantidad: 1, precio_unitario: 0, total: 0, stock_disponible: 0 }] as ProductoVenta[],
-    total: 0
+    total: 0,
+    comentario: ''
   })
 
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null)
   const [rastreo, setRastreo] = useState('')
   const [isRastreoDialogOpen, setIsRastreoDialogOpen] = useState(false)
-  const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'completado' | 'anulado'>('pendiente')
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'anulado'>('pendiente')
   const [isEstadoDialogOpen, setIsEstadoDialogOpen] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
+  const [filtroMes, setFiltroMes] = useState<string>('todos')
+  const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
 
   useEffect(() => {
     loadVentas()
@@ -96,6 +121,20 @@ export default function VentasPage() {
     // Aplicar filtro por estado
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(venta => venta.estado === filtroEstado)
+    }
+
+    // Aplicar filtro por visitador
+    if (filtroVisitador !== 'todos') {
+      filtrados = filtrados.filter(venta => venta.visitador === filtroVisitador)
+    }
+
+    // Aplicar filtro por mes y año
+    if (filtroMes !== 'todos') {
+      const [mes, año] = filtroMes.split('-')
+      filtrados = filtrados.filter(venta => {
+        const fecha = new Date(venta.fecha)
+        return fecha.getMonth() + 1 === parseInt(mes) && fecha.getFullYear() === parseInt(año)
+      })
     }
 
     // Aplicar filtro de búsqueda
@@ -114,24 +153,7 @@ export default function VentasPage() {
     }
 
     setVentasFiltradas(filtrados)
-  }, [ventas, filtroEstado, searchTerm])
-
-  useEffect(() => {
-    // Si alguna venta tiene saldo_venta 0 y no está completada, actualizar su estado automáticamente
-    ventas.forEach(async (venta) => {
-      if (venta.saldo_venta === 0 && venta.estado !== 'completado') {
-        try {
-          await supabase
-            .from('ventas_mensuales')
-            .update({ estado: 'completado' })
-            .eq('id', venta.id)
-          setVentas((prev) => prev.map(v => v.id === venta.id ? { ...v, estado: 'completado' } : v))
-        } catch (error) {
-          console.error('Error al actualizar estado a completado:', error)
-        }
-      }
-    })
-  }, [ventas])
+  }, [ventas, filtroEstado, filtroVisitador, searchTerm, filtroMes])
 
   const loadVentas = async () => {
     try {
@@ -142,15 +164,32 @@ export default function VentasPage() {
           ...venta,
           clientes: {
             id: cliente.id,
+            codigo: cliente.codigo,
             nombre: cliente.nombre,
             direccion: cliente.direccion,
             telefono: cliente.telefono,
             nit: cliente.nit,
+            propietario: cliente.propietario,
             saldo_pendiente: cliente.saldo_pendiente
           },
           productos: venta.productos || []
         } as Venta
       })
+
+      // Verificar y actualizar estados basados en saldo_venta
+      for (const venta of ventasFormateadas) {
+        if (venta.saldo_venta === 0 && venta.estado !== 'completado') {
+          const { error } = await supabase
+            .from('ventas_mensuales')
+            .update({ estado: 'completado' })
+            .eq('id', venta.id)
+
+          if (!error) {
+            venta.estado = 'completado'
+          }
+        }
+      }
+
       setVentas(ventasFormateadas)
     } catch (error) {
       console.error('Error al cargar ventas:', error)
@@ -206,10 +245,11 @@ export default function VentasPage() {
 
   const loadUsuarios = async () => {
     try {
-      const data = await usuariosService.getUsuarios()
-      setUsuarios(data)
+      const usuarios = await usuariosService.getUsuarios()
+      setUsuarios(usuarios)
     } catch (error) {
       console.error('Error al cargar usuarios:', error)
+      setError('Error al cargar usuarios')
     }
   }
 
@@ -351,7 +391,8 @@ export default function VentasPage() {
           total: p.total
         })),
         total: formData.total,
-        visitador: user.id
+        visitador: user.id,
+        comentario: formData.comentario
       })
 
       setVentas([...ventas, nuevaVenta])
@@ -359,7 +400,8 @@ export default function VentasPage() {
         cliente_id: '',
         fecha: new Date().toISOString().split('T')[0],
         productos: [{ id: '', nombre: '', cantidad: 1, precio_unitario: 0, total: 0, stock_disponible: 0 }],
-        total: 0
+        total: 0,
+        comentario: ''
       })
       setIsDialogOpen(false)
       toast({
@@ -388,13 +430,9 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
-      const updates: any = { rastreo }
-      if (rastreo && rastreo.trim() !== '') {
-        updates.estado = 'enviado'
-      }
       const { error } = await supabase
         .from('ventas_mensuales')
-        .update(updates)
+        .update({ rastreo })
         .eq('id', ventaSeleccionada.id)
 
       if (error) throw error
@@ -402,7 +440,7 @@ export default function VentasPage() {
       // Actualizar el estado local
       setVentas(ventas.map(v => 
         v.id === ventaSeleccionada.id 
-          ? { ...v, rastreo, estado: updates.estado ? 'enviado' : v.estado } 
+          ? { ...v, rastreo } 
           : v
       ))
 
@@ -423,56 +461,14 @@ export default function VentasPage() {
 
   const handleCambiarEstado = async (venta: Venta) => {
     setVentaSeleccionada(venta)
-    setEstadoSeleccionado(venta.estado as 'pendiente' | 'enviado' | 'completado' | 'anulado')
+    setEstadoSeleccionado(venta.estado as 'pendiente' | 'enviado' | 'anulado')
     setIsEstadoDialogOpen(true)
   }
 
-  const handleGuardarEstado = async () => {
+  const handleConfirmarCambioEstado = async () => {
     if (!ventaSeleccionada) return
 
     try {
-      let nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente
-
-      // Si el estado es "anulado"
-      if (estadoSeleccionado === 'anulado') {
-        // Restar el total del saldo pendiente del cliente
-        nuevoSaldo = ventaSeleccionada.clientes.saldo_pendiente - ventaSeleccionada.total
-        
-        // Actualizar el saldo del cliente
-        const { error: saldoError } = await supabase
-          .from('clientes')
-          .update({ saldo_pendiente: nuevoSaldo })
-          .eq('id', ventaSeleccionada.cliente_id)
-
-        if (saldoError) throw saldoError
-
-        // Actualizar el stock de cada producto
-        if (ventaSeleccionada.productos) {
-          for (const producto of ventaSeleccionada.productos) {
-            // Obtener el stock actual
-            const { data: productoActual } = await supabase
-              .from('productos')
-              .select('stock')
-              .eq('id', producto.id)
-              .single()
-
-            if (productoActual) {
-              // Calcular el nuevo stock sumando la cantidad vendida
-              const nuevoStock = productoActual.stock + producto.cantidad
-
-              // Actualizar el stock en la base de datos
-              const { error: stockError } = await supabase
-                .from('productos')
-                .update({ stock: nuevoStock })
-                .eq('id', producto.id)
-
-              if (stockError) throw stockError
-            }
-          }
-        }
-      }
-
-      // Actualizar el estado en la base de datos
       const { error } = await supabase
         .from('ventas_mensuales')
         .update({ estado: estadoSeleccionado })
@@ -480,38 +476,18 @@ export default function VentasPage() {
 
       if (error) throw error
 
-      // Actualizar la interfaz
-      setVentas(ventas.map(v => {
-        if (v.id === ventaSeleccionada.id) {
-          return {
-            ...v,
-            estado: estadoSeleccionado,
-            clientes: {
-              ...v.clientes,
-              saldo_pendiente: estadoSeleccionado === 'anulado' ? nuevoSaldo : v.clientes.saldo_pendiente
-            }
-          }
-        }
-        return v
-      }))
-
-      // Recargar los productos para actualizar el stock en la interfaz
-      if (estadoSeleccionado === 'anulado') {
-        loadProductos()
-      }
-
-      setIsEstadoDialogOpen(false)
       toast({
         title: 'Estado actualizado',
-        description: estadoSeleccionado === 'anulado' 
-          ? 'La venta ha sido anulada, el saldo del cliente y el stock han sido actualizados'
-          : 'El estado de la venta se ha actualizado correctamente'
+        description: `La venta ahora está ${estadoSeleccionado}`,
       })
+
+      setIsEstadoDialogOpen(false)
+      loadVentas()
     } catch (error) {
-      console.error('Error al actualizar estado:', error)
+      console.error('Error al cambiar estado:', error)
       toast({
         title: 'Error',
-        description: 'No se pudo actualizar el estado de la venta',
+        description: 'No se pudo cambiar el estado de la venta',
         variant: 'destructive'
       })
     }
@@ -575,7 +551,7 @@ export default function VentasPage() {
       y += 14
       doc.text(`No. Venta: ${venta.codigo || '-'}`, 10, y)
       y += 14
-      doc.text(`Fecha: ${format(new Date(venta.fecha), 'dd/MM/yyyy')}`, 10, y)
+      doc.text(`Fecha: ${new Date(venta.fecha).toLocaleDateString()}`, 10, y)
       y += 14
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
@@ -625,12 +601,7 @@ export default function VentasPage() {
       doc.text('VISITADOR', 82, y, { align: 'center' })
       doc.setFont('helvetica', 'normal')
       y += 14
-      doc.text(`Visitador: ${(() => {
-        const visitadorObj = visitadores.find(v => v.id === venta.visitador)
-        if (visitadorObj) return visitadorObj.nombre
-        const usuarioObj = usuarios.find(u => u.id === venta.visitador)
-        return usuarioObj?.nombre || 'N/A'
-      })()}`, 10, y)
+      doc.text(`Visitador: ${visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}`, 10, y)
       y += 20
       doc.setLineWidth(0.5)
       doc.line(10, y, 154, y)
@@ -652,6 +623,226 @@ export default function VentasPage() {
       doc.save(`Venta_${venta.codigo}.pdf`)
     }
   }
+
+  // Función para exportar la venta a Excel
+  const handleExportarExcel = async (venta: Venta) => {
+    try {
+      // Crear una nueva hoja de trabajo
+      const wb = XLSX.utils.book_new()
+      
+      // Estilo base para todas las celdas
+      const baseStyle = {
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        },
+        font: { name: 'Arial', sz: 10 },
+        alignment: { vertical: 'center', horizontal: 'left' }
+      }
+
+      // Estilo para encabezados y bordes gruesos
+      const thickBorderStyle = {
+        ...baseStyle,
+        border: {
+          top: { style: 'medium', color: { rgb: '000000' } },
+          bottom: { style: 'medium', color: { rgb: '000000' } },
+          left: { style: 'medium', color: { rgb: '000000' } },
+          right: { style: 'medium', color: { rgb: '000000' } }
+        }
+      }
+
+      // Estilo para encabezados centrados
+      const headerStyle = {
+        ...thickBorderStyle,
+        font: { ...baseStyle.font, bold: true },
+        alignment: { vertical: 'center', horizontal: 'center' }
+      }
+
+      // Bloque de información del envío con bordes gruesos
+      const envioData = [
+        [{ v: 'ENVIO', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }],
+        [{ v: 'N° Envío', s: thickBorderStyle }, { v: venta.codigo || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'Fecha', s: thickBorderStyle }, { v: format(new Date(venta.fecha), 'dd/MM/yyyy'), s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'Nombre Visitador', s: thickBorderStyle }, { 
+          v: (() => {
+            const visitadorObj = visitadores.find(v => v.id === venta.visitador)
+            if (visitadorObj) return visitadorObj.nombre
+            const usuarioObj = usuarios.find(u => u.id === venta.visitador)
+            return usuarioObj?.nombre || 'N/A'
+          })(), 
+          s: thickBorderStyle 
+        }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }]
+      ]
+
+      // Fila vacía para separar bloques
+      const emptyRow = Array(5).fill({ v: '', s: { font: { name: 'Arial', sz: 10 } } })
+
+      // Información del cliente con bordes gruesos en toda la fila (título y valor)
+      const clienteData = [
+        [{ v: 'Información del cliente', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }, { v: '', s: headerStyle }],
+        [{ v: 'Nombre', s: thickBorderStyle }, { v: venta.clientes?.nombre || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'Dirección', s: thickBorderStyle }, { v: venta.clientes?.direccion || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'Teléfono', s: thickBorderStyle }, { v: venta.clientes?.telefono || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'NIT', s: thickBorderStyle }, { v: venta.clientes?.nit || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }],
+        [{ v: 'Propietario', s: thickBorderStyle }, { v: venta.clientes?.propietario || '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }, { v: '', s: thickBorderStyle }]
+      ]
+
+      // Encabezados de productos con estilos
+      const tableHeaders = [[
+        { v: 'Cod.', s: thickBorderStyle },
+        { v: 'Descripción', s: thickBorderStyle },
+        { v: 'Cantidad', s: thickBorderStyle },
+        { v: 'Precio unitario', s: thickBorderStyle },
+        { v: 'Total', s: thickBorderStyle }
+      ]]
+
+      // Datos de productos con código correcto (match por id o por nombre)
+      const productsData = venta.productos ? venta.productos.map(prod => {
+        let productoFull = productos.find(p => p.id === prod.id)
+        if (!productoFull) {
+          productoFull = productos.find(p => p.nombre.trim().toLowerCase() === prod.nombre.trim().toLowerCase())
+        }
+        return [
+          { v: productoFull?.codigo || '', s: baseStyle },
+          { v: prod.nombre, s: baseStyle },
+          { v: prod.cantidad, s: baseStyle },
+          { v: prod.precio_unitario.toFixed(2), s: baseStyle },
+          { v: prod.total.toFixed(2), s: baseStyle }
+        ]
+      }) : []
+
+      while (productsData.length < 15) {
+        productsData.push(Array(5).fill({ v: '', s: baseStyle }))
+      }
+
+      // Datos del pie con estilos
+      const footerData = [
+        [
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: 'SUB TOTAL', s: thickBorderStyle },
+          { v: venta.total.toFixed(2), s: thickBorderStyle }
+        ],
+        [
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: 'DESCUENTO', s: thickBorderStyle },
+          { v: '0.00', s: thickBorderStyle }
+        ],
+        [
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: 'TOTAL', s: thickBorderStyle },
+          { v: venta.total.toFixed(2), s: thickBorderStyle }
+        ],
+        Array(5).fill({ v: '', s: baseStyle }),
+        [
+          { v: 'ESTO NO ES UN COMPROBANTE CONTABLE', s: { 
+            ...baseStyle, 
+            font: { ...baseStyle.font, bold: true },
+            alignment: { vertical: 'center', horizontal: 'left' },
+            border: {
+              top: { style: 'medium', color: { rgb: '000000' } },
+              bottom: { style: 'medium', color: { rgb: '000000' } },
+              left: { style: 'medium', color: { rgb: '000000' } },
+              right: { style: 'medium', color: { rgb: '000000' } }
+            }
+          }},
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle },
+          { v: '', s: baseStyle }
+        ]
+      ]
+
+      // Combinar todos los datos con filas vacías entre bloques
+      const allData = [
+        ...envioData,
+        emptyRow,
+        ...clienteData,
+        emptyRow,
+        ...tableHeaders,
+        ...productsData,
+        ...footerData
+      ]
+
+      // Crear la hoja y agregarla al libro
+      const ws = XLSX.utils.aoa_to_sheet(allData)
+
+      // Configurar ancho de columnas
+      ws['!cols'] = [
+        { wch: 12 },   // Código (aumentado de 9 a 12)
+        { wch: 25 },   // Descripción (aumentado de 22 a 25)
+        { wch: 10 },   // Cantidad (aumentado de 8 a 10)
+        { wch: 14 },   // Precio unitario (aumentado de 12 a 14)
+        { wch: 14 }    // Total (aumentado de 12 a 14)
+      ]
+
+      // Definir las celdas a combinar
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // ENVIO
+        { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } }, // N° Envío valor
+        { s: { r: 2, c: 1 }, e: { r: 2, c: 4 } }, // Fecha valor
+        { s: { r: 3, c: 1 }, e: { r: 3, c: 4 } }, // Nombre Visitador valor
+        { s: { r: 5, c: 0 }, e: { r: 5, c: 4 } }, // Información del cliente
+        { s: { r: 6, c: 1 }, e: { r: 6, c: 4 } }, // Nombre valor
+        { s: { r: 7, c: 1 }, e: { r: 7, c: 4 } }, // Dirección valor
+        { s: { r: 8, c: 1 }, e: { r: 8, c: 4 } }, // Teléfono valor
+        { s: { r: 9, c: 1 }, e: { r: 9, c: 4 } }, // NIT valor
+        { s: { r: 10, c: 1 }, e: { r: 10, c: 4 } }, // Propietario valor
+        // Unir toda la última fila para el mensaje final
+        { s: { r: allData.length - 1, c: 0 }, e: { r: allData.length - 1, c: 4 } }
+      ]
+
+      // Asegurar borde grueso en la última fila
+      const lastRowIdx = allData.length - 1
+      for (let c = 0; c < 5; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: lastRowIdx, c })]
+        if (cell) {
+          cell.s = {
+            ...cell.s,
+            border: {
+              top: { style: 'medium', color: { rgb: '000000' } },
+              bottom: { style: 'medium', color: { rgb: '000000' } },
+              left: { style: 'medium', color: { rgb: '000000' } },
+              right: { style: 'medium', color: { rgb: '000000' } }
+            }
+          }
+        }
+      }
+
+      // Agregar la hoja al libro y guardar
+      XLSX.utils.book_append_sheet(wb, ws, 'Venta')
+      XLSX.writeFile(wb, `Venta_${venta.codigo}.xlsx`)
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo exportar la venta a Excel',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Obtener los meses y años únicos de las ventas
+  const mesesDisponibles = Array.from(
+    new Set(
+      ventas.map(venta => {
+        const fecha = new Date(venta.fecha)
+        return `${fecha.getMonth() + 1}-${fecha.getFullYear()}`
+      })
+    )
+  )
+    .map(key => {
+      const [mes, año] = key.split('-')
+      return { mes: parseInt(mes), año: parseInt(año) }
+    })
+    .sort((a, b) => b.año !== a.año ? b.año - a.año : b.mes - a.mes)
 
   if (loading) {
     return <div>Cargando ventas...</div>
@@ -726,6 +917,17 @@ export default function VentasPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="comentario">Comentario</Label>
+                  <textarea
+                    id="comentario"
+                    className="w-full min-h-[100px] p-2 border rounded-md"
+                    value={formData.comentario}
+                    onChange={(e) => setFormData({ ...formData, comentario: e.target.value })}
+                    placeholder="Ingrese un comentario sobre la venta (opcional)"
+                  />
                 </div>
 
                 <div className="space-y-4">
@@ -824,26 +1026,68 @@ export default function VentasPage() {
         </Dialog>
       </div>
 
-      <div className="mb-6 flex gap-4 items-center">
-        <Input
-          placeholder="Buscar en ventas..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md"
-        />
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Filtrar por estado:</span>
-          <select
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            type="search"
+            placeholder="Buscar ventas..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="w-[200px]">
+          <Select
             value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="text-sm border rounded p-1.5 bg-white"
+            onValueChange={setFiltroEstado}
           >
-            <option value="todos">Todos</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="enviado">Enviado</option>
-            <option value="completado">Completado</option>
-            <option value="anulado">Anulado</option>
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los estados</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="enviado">Enviado</SelectItem>
+              <SelectItem value="completado">Completado</SelectItem>
+              <SelectItem value="anulado">Anulado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-[200px]">
+          <Select
+            value={filtroMes}
+            onValueChange={setFiltroMes}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por mes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los meses</SelectItem>
+              {mesesDisponibles.map(({ mes, año }) => (
+                <SelectItem key={`${mes}-${año}`} value={`${mes}-${año}`}>
+                  {new Date(año, mes - 1, 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-[200px]">
+          <Select
+            value={filtroVisitador}
+            onValueChange={setFiltroVisitador}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por visitador" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los visitadores</SelectItem>
+              {visitadores.map((visitador) => (
+                <SelectItem key={visitador.id} value={visitador.id}>
+                  {visitador.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -860,6 +1104,7 @@ export default function VentasPage() {
               <th className="px-3 py-1.5 text-right">Saldo Pendiente</th>
               <th className="px-3 py-1.5 text-left">Rastreo</th>
               <th className="px-3 py-1.5 text-left">Estado</th>
+              <th className="px-3 py-1.5 text-left">Comentario</th>
               <th className="px-3 py-1.5 text-left">Productos</th>
               <th className="px-3 py-1.5 text-center">Acciones</th>
             </tr>
@@ -870,15 +1115,10 @@ export default function VentasPage() {
                 <td className="px-3 py-1.5">{venta.codigo}</td>
                 <td className="px-3 py-1.5">{venta.clientes.nombre}</td>
                 <td className="px-3 py-1.5">
-                  {format(new Date(venta.fecha), 'dd/MM/yyyy')}
+                  {new Date(venta.fecha).toLocaleDateString()}
                 </td>
                 <td className="px-3 py-1.5">
-                  {(() => {
-                    const visitadorObj = visitadores.find(v => v.id === venta.visitador)
-                    if (visitadorObj) return visitadorObj.nombre
-                    const usuarioObj = usuarios.find(u => u.id === venta.visitador)
-                    return usuarioObj?.nombre || 'N/A'
-                  })()}
+                  {visitadores.find(v => v.id === venta.visitador)?.nombre || 'N/A'}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   Q{venta.total.toFixed(2)}
@@ -898,6 +1138,9 @@ export default function VentasPage() {
                   </span>
                 </td>
                 <td className="px-3 py-1.5">
+                  {venta.comentario || '-'}
+                </td>
+                <td className="px-3 py-1.5">
                   {venta.productos && venta.productos.length > 0 && (
                     <ul className="list-disc list-inside text-xs">
                       {venta.productos.map((producto, index) => (
@@ -909,6 +1152,13 @@ export default function VentasPage() {
                   )}
                 </td>
                 <td className="px-3 py-1.5 space-x-1 flex items-center gap-2">
+                  <button
+                    onClick={() => handleExportarExcel(venta)}
+                    className="p-1.5 text-gray-600 hover:text-green-600 transition-colors"
+                    title="Exportar a Excel"
+                  >
+                    <TableCellsIcon className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={() => handleImprimirVenta(venta)}
                     className="p-1.5 text-gray-600 hover:text-indigo-600 transition-colors"
@@ -970,34 +1220,41 @@ export default function VentasPage() {
 
       {/* Diálogo para cambiar estado */}
       <Dialog open={isEstadoDialogOpen} onOpenChange={setIsEstadoDialogOpen}>
-        <DialogContent aria-describedby="estado-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Cambiar Estado de la Venta</DialogTitle>
-            <DialogDescription id="estado-dialog-description">
-              Seleccione el nuevo estado para la venta {ventaSeleccionada?.codigo}
+            <DialogDescription>
+              Seleccione el nuevo estado para la venta
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="estado">Estado</Label>
+            <div className="space-y-2">
+              <Label>Estado</Label>
               <Select
                 value={estadoSeleccionado}
-                onValueChange={(value: 'pendiente' | 'enviado' | 'completado' | 'anulado') => setEstadoSeleccionado(value)}
+                onValueChange={(value: 'pendiente' | 'enviado' | 'anulado') => setEstadoSeleccionado(value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estado" />
+                  <SelectValue placeholder="Seleccione un estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="enviado">Enviado</SelectItem>
-                  <SelectItem value="completado">Completado</SelectItem>
                   <SelectItem value="anulado">Anulado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleGuardarEstado} className="w-full">
-              Guardar Estado
-            </Button>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsEstadoDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleConfirmarCambioEstado}>
+                Confirmar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
