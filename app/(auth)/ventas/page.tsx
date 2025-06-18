@@ -399,9 +399,23 @@ export default function VentasPage() {
     if (!ventaSeleccionada) return
 
     try {
+      // Determinar el nuevo estado basado en si hay rastreo
+      // Si el saldo_venta es 0, el trigger lo cambiará a 'completado'
+      // Si hay rastreo y el saldo_venta > 0, cambiar a 'enviado'
+      // Si no hay rastreo, mantener el estado actual o 'pendiente'
+      let nuevoEstado = ventaSeleccionada.estado || 'pendiente'
+      
+      if (rastreo.trim()) {
+        // Si hay rastreo, cambiar a enviado (a menos que el saldo sea 0)
+        nuevoEstado = ventaSeleccionada.saldo_venta === 0 ? 'completado' : 'enviado'
+      }
+      
       const { error } = await supabase
         .from('ventas_mensuales')
-        .update({ rastreo })
+        .update({ 
+          rastreo,
+          estado: nuevoEstado
+        })
         .eq('id', ventaSeleccionada.id)
 
       if (error) throw error
@@ -409,14 +423,16 @@ export default function VentasPage() {
       // Actualizar el estado local
       setVentas(ventas.map(v => 
         v.id === ventaSeleccionada.id 
-          ? { ...v, rastreo } 
+          ? { ...v, rastreo, estado: nuevoEstado } 
           : v
       ))
 
       setIsRastreoDialogOpen(false)
       toast({
         title: 'Rastreo actualizado',
-        description: 'El número de rastreo se ha actualizado correctamente'
+        description: rastreo.trim() 
+          ? `El número de rastreo se ha actualizado y el estado cambió a ${nuevoEstado}`
+          : 'El número de rastreo se ha actualizado correctamente'
       })
     } catch (error) {
       console.error('Error al actualizar rastreo:', error)
@@ -843,6 +859,190 @@ export default function VentasPage() {
     }
   }
 
+  const handleExportarPDF = async (venta: Venta) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      // Cargar y agregar el logo usando la API nativa
+      const logo = new window.Image()
+      logo.src = '/sin-titulo.png'
+      
+      await new Promise((resolve) => {
+        logo.onload = () => {
+          doc.addImage(logo, 'PNG', 10, 10, 40, 20)
+          resolve(null)
+        }
+      })
+
+      // Configuración inicial
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(16)
+      doc.text('ENVIO', 105, 20, { align: 'center', baseline: 'middle' })
+      
+      // Información del envío
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      let y = 40
+      
+      doc.setFont('helvetica', 'bold')
+      doc.text('N° Envío:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.codigo || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('Fecha:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(format(new Date(venta.fecha), 'dd/MM/yyyy'), 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('Nombre Visitador:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      const visitadorNombre = (() => {
+        const visitadorObj = visitadores.find(v => v.id === venta.visitador)
+        if (visitadorObj) return visitadorObj.nombre
+        const usuarioObj = usuarios.find(u => u.id === venta.visitador)
+        return usuarioObj?.nombre || 'N/A'
+      })()
+      doc.text(visitadorNombre, 40, y, { baseline: 'middle' })
+
+      // Información del cliente
+      y += 15
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text('Información del cliente', 105, y, { align: 'center', baseline: 'middle' })
+      
+      y += 7
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Nombre:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.nombre || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('Dirección:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.direccion || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('Teléfono:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.telefono || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('NIT:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.nit || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text('Propietario:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.propietario || '', 40, y, { baseline: 'middle' })
+
+      // Tabla de productos
+      y += 15
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text('Productos', 105, y, { align: 'center', baseline: 'middle' })
+      
+      y += 7
+      doc.setFontSize(10)
+      
+      // Encabezados de la tabla
+      const headers = ['Cod.', 'Descripción', 'Cantidad', 'Precio unitario', 'Total']
+      const columnWidths = [20, 70, 25, 35, 35]
+      let x = 10
+      
+      doc.setFont('helvetica', 'bold')
+      headers.forEach((header, i) => {
+        doc.text(header, x, y, { baseline: 'middle' })
+        x += columnWidths[i]
+      })
+      
+      // Línea separadora
+      y += 3
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 195, y)
+      y += 3
+
+      // Datos de productos
+      doc.setFont('helvetica', 'normal')
+      if (venta.productos && venta.productos.length > 0) {
+        venta.productos.forEach(prod => {
+          let productoFull = productos.find(p => p.id === prod.id)
+          if (!productoFull) {
+            productoFull = productos.find(p => p.nombre.trim().toLowerCase() === prod.nombre.trim().toLowerCase())
+          }
+          
+          x = 10
+          doc.text(productoFull?.codigo || '', x, y, { baseline: 'middle' })
+          x += columnWidths[0]
+          
+          doc.text(prod.nombre, x, y, { baseline: 'middle' })
+          x += columnWidths[1]
+          
+          doc.text(prod.cantidad.toString(), x, y, { baseline: 'middle' })
+          x += columnWidths[2]
+          
+          doc.text(`Q${prod.precio_unitario.toFixed(2)}`, x, y, { baseline: 'middle' })
+          x += columnWidths[3]
+          
+          doc.text(`Q${prod.total.toFixed(2)}`, x, y, { baseline: 'middle' })
+          
+          y += 7
+        })
+      }
+
+      // Totales
+      y += 7
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 195, y)
+      y += 7
+
+      doc.setFont('helvetica', 'bold')
+      doc.text('SUB TOTAL:', 120, y, { baseline: 'middle' })
+      doc.text(`Q${venta.total.toFixed(2)}`, 155, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.text('DESCUENTO:', 120, y, { baseline: 'middle' })
+      doc.text('Q0.00', 155, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.text('TOTAL:', 120, y, { baseline: 'middle' })
+      doc.text(`Q${venta.total.toFixed(2)}`, 155, y, { baseline: 'middle' })
+
+      // Pie de página
+      y += 15
+      doc.setLineWidth(0.5)
+      doc.line(10, y, 195, y)
+      y += 7
+      
+      doc.setFont('helvetica', 'bold')
+      doc.text('ESTO NO ES UN COMPROBANTE CONTABLE', 105, y, { align: 'center', baseline: 'middle' })
+      y += 7
+      doc.text('Gracias por su compra', 105, y, { align: 'center', baseline: 'middle' })
+
+      // Guardar el PDF
+      doc.save(`Venta_${venta.codigo}.pdf`)
+    } catch (error) {
+      console.error('Error al exportar a PDF:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo exportar la venta a PDF',
+        variant: 'destructive'
+      })
+    }
+  }
+
   if (loading) {
     return <div>Cargando ventas...</div>
   }
@@ -1115,6 +1315,19 @@ export default function VentasPage() {
                     title="Exportar a Excel"
                   >
                     <TableCellsIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleExportarPDF(venta)}
+                    className="p-1.5 text-gray-600 hover:text-red-600 transition-colors"
+                    title="Exportar a PDF"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <line x1="10" y1="9" x2="8" y2="9"/>
+                    </svg>
                   </button>
                   <button
                     onClick={() => handleImprimirVenta(venta)}
