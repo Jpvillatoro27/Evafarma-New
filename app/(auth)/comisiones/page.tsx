@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usuariosService } from '@/lib/services'
 import jsPDF from 'jspdf'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 interface Comision {
   id: string
@@ -75,6 +77,11 @@ export default function ComisionesPage() {
   const [filtroAnioResumen, setFiltroAnioResumen] = useState<string>('todos')
   const [visitadoresError, setVisitadoresError] = useState<string | null>(null)
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([])
+  // Estado para mes seleccionado para comisiones mensuales
+  const [mesSeleccionadoComisiones, setMesSeleccionadoComisiones] = useState<string>('')
+  const [anioSeleccionadoComisiones, setAnioSeleccionadoComisiones] = useState<string>('')
+  // Estado para mostrar diálogo de selección de mes/año
+  const [mostrarDialogoComisiones, setMostrarDialogoComisiones] = useState(false)
 
   useEffect(() => {
     if (user && user.rol !== 'admin') {
@@ -324,30 +331,45 @@ export default function ComisionesPage() {
     doc.save(`Liquidacion_${visitador.nombre}_${rangoSemanaFmt}.pdf`)
   }
 
-  // Nueva función para PDF de comisiones con % y comisión
-  function generarPDFComisionesVisitador(semana: string) {
+  // Nueva función para PDF de comisiones mensuales con % y comisión
+  function generarPDFComisionesMensuales() {
     const visitador = visitadores.find(v => v.id === filtroVisitador)
-    if (!visitador) return
-    // Filtrar comisiones de la semana y visitador
-    const comisionesVisitador = comisionesFiltradas.filter(c => getWeekKey(c.fecha_cobro, getNombreVisitador(c.visitador_id)) === semana)
-    if (comisionesVisitador.length === 0) return
+    if (!visitador || !mesSeleccionadoComisiones || !anioSeleccionadoComisiones) return
+    
+    // Filtrar comisiones del mes y visitador seleccionados
+    const comisionesVisitador = comisionesFiltradas.filter(c => {
+      const fechaCobro = new Date(c.fecha_cobro)
+      const mes = (fechaCobro.getMonth() + 1).toString().padStart(2, '0')
+      const anio = fechaCobro.getFullYear().toString()
+      return c.visitador_id === filtroVisitador && 
+             mes === mesSeleccionadoComisiones && 
+             anio === anioSeleccionadoComisiones
+    })
+    
+    if (comisionesVisitador.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay comisiones para el mes seleccionado',
+        variant: 'destructive'
+      })
+      return
+    }
 
-    // Extraer solo el rango de fechas de la semana
-    const rangoSemana = semana.split(' - ')[0]
+    // Calcular primer y último día del mes
+    const primerDia = new Date(parseInt(anioSeleccionadoComisiones), parseInt(mesSeleccionadoComisiones) - 1, 1)
+    const ultimoDia = new Date(parseInt(anioSeleccionadoComisiones), parseInt(mesSeleccionadoComisiones), 0)
+    const periodoFmt = `${format(primerDia, 'dd/MM/yyyy')} a ${format(ultimoDia, 'dd/MM/yyyy')}`
+    
     // Cambiar a formato horizontal (landscape) y mantener margen
     const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' })
     let y = 80
     // Insertar logo pequeño en la esquina superior izquierda
     doc.addImage('/sin-titulo.png', 'PNG', 40, 30, 90, 30)
     doc.setFontSize(16)
-    doc.text('Control de Comisiones Semanal', 400, y, { align: 'center' })
+    doc.text('Control de Comisiones Mensual', 400, y, { align: 'center' })
     y += 24
     doc.setFontSize(10)
-    const [inicio, fin] = rangoSemana.split(' a ')
-    const inicioFmt = format(new Date(inicio), 'dd/MM/yyyy')
-    const finFmt = format(new Date(fin), 'dd/MM/yyyy')
-    const rangoSemanaFmt = `${inicioFmt} a ${finFmt}`
-    doc.text(`Semana: ${rangoSemanaFmt}`, 40, y)
+    doc.text(`Periodo: ${periodoFmt}`, 40, y)
     doc.text(`Visitador: ${visitador.nombre}`, 540, y)
     y += 20
     // Encabezados de tabla (con % y Comisión)
@@ -427,7 +449,7 @@ export default function ComisionesPage() {
     doc.text('_____________________________', xFechaVenta, y)
     y += 14
     doc.text(visitador.nombre, xFechaVenta, y)
-    doc.save(`Comisiones_${visitador.nombre}_${rangoSemanaFmt}.pdf`)
+    doc.save(`Comisiones_${visitador.nombre}_${periodoFmt}.pdf`)
   }
 
   // Hook para obtener y cachear fechas de venta por venta_id
@@ -514,6 +536,11 @@ export default function ComisionesPage() {
     return `${inicioFmt} a ${finFmt}${rest.length ? ' - ' + rest.join(' - ') : ''}`
   }
 
+  // Función para manejar el clic del botón de comisiones mensuales
+  function handleComisionesMensuales() {
+    setMostrarDialogoComisiones(true)
+  }
+
   if (loading && user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -587,10 +614,12 @@ export default function ComisionesPage() {
             <Button onClick={() => generarPDFLiquidacionVisitador(semanaSeleccionada)} className="bg-blue-600 hover:bg-blue-700 text-white">
               Imprimir Liquidaciones Semanal
             </Button>
-            <Button onClick={() => generarPDFComisionesVisitador(semanaSeleccionada)} className="bg-green-600 hover:bg-green-700 text-white">
-              Imprimir comisiones semanal
-            </Button>
           </>
+        )}
+        {filtroVisitador !== 'todos' && (
+          <Button onClick={handleComisionesMensuales} className="bg-green-600 hover:bg-green-700 text-white">
+            Imprimir comisiones mensual
+          </Button>
         )}
       </div>
 
@@ -758,6 +787,70 @@ export default function ComisionesPage() {
           ))}
         </div>
       </div>
+
+      {/* Diálogo para seleccionar mes y año para comisiones mensuales */}
+      <Dialog open={mostrarDialogoComisiones} onOpenChange={setMostrarDialogoComisiones}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Seleccionar Mes y Año para Comisiones Mensuales</DialogTitle>
+            <DialogDescription>
+              Selecciona el mes y año para generar el reporte de comisiones mensuales
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="mes-comisiones">Mes</Label>
+              <Select value={mesSeleccionadoComisiones} onValueChange={setMesSeleccionadoComisiones}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mesesDisponibles.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="anio-comisiones">Año</Label>
+              <Select value={anioSeleccionadoComisiones} onValueChange={setAnioSeleccionadoComisiones}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un año" />
+                </SelectTrigger>
+                <SelectContent>
+                  {aniosDisponibles.map(anio => (
+                    <SelectItem key={anio} value={anio.toString()}>{anio}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setMostrarDialogoComisiones(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (mesSeleccionadoComisiones && anioSeleccionadoComisiones) {
+                    generarPDFComisionesMensuales()
+                    setMostrarDialogoComisiones(false)
+                  } else {
+                    toast({
+                      title: 'Error',
+                      description: 'Por favor selecciona mes y año',
+                      variant: 'destructive'
+                    })
+                  }
+                }}
+              >
+                Generar PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 
