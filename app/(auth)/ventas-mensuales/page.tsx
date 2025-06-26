@@ -11,16 +11,16 @@ interface VentaSemanal {
   meta: number
   porcentaje: number
   clientes: {
-    id: any
-    codigo: any
-    nombre: any
-    direccion: any
-    telefono: any
-    nit: any
-    propietario: any
-    saldo_pendiente: any
+    id: string
+    codigo: string
+    nombre: string
+    direccion?: string
+    telefono?: string
+    nit?: string
+    propietario?: string
+    saldo_pendiente: number
     Departamento?: string
-  }[]
+  }
 }
 
 interface CobroSemanal {
@@ -41,6 +41,39 @@ interface Usuario {
   email: string
   nombre: string
   rol: 'admin' | 'visitador'
+}
+
+interface VentaDB {
+  id: string
+  codigo: string
+  fecha: string
+  cliente_id: string
+  visitador: string
+  total: number
+  created_at: string
+  estado: string
+  rastreo: string
+  saldo_venta: number
+  comentario: string
+  clientes: {
+    id: string
+    codigo: string
+    nombre: string
+    direccion: string
+    telefono: string
+    nit: string
+    propietario: string
+    saldo_pendiente: number
+  }[]
+  productos: any[]
+}
+
+interface CobroDB {
+  id: string
+  fecha: string
+  total: number
+  visitador: string
+  Estado?: string
 }
 
 export default function VentasMensualesPage() {
@@ -68,16 +101,19 @@ export default function VentasMensualesPage() {
       
       const visitadoresFiltrados = usuarioActual?.rol === 'admin'
         ? usuarios
-        : usuarios.filter(visitador => visitador.id === usuarioActual?.id)
+        : usuarios.filter((visitador: { id: string }) => visitador.id === usuarioActual?.id)
       
-      const visitadoresData = visitadoresFiltrados.map(visitador => {
-        const ventasVisitador = ventas.filter(venta => venta.visitador === visitador.id)
-        const cobrosVisitador = cobros.filter(cobro => 
+      const visitadoresData = visitadoresFiltrados.map((visitador: { id: string; nombre: string }) => {
+        const ventasVisitador = ventas.filter((venta: VentaDB) => 
+          venta.visitador === visitador.id && 
+          venta.estado?.toLowerCase() !== 'anulado'
+        )
+        const cobrosVisitador = cobros.filter((cobro: CobroDB) => 
           cobro.visitador === visitador.id && 
           cobro.Estado?.toUpperCase() === 'CONFIRMADO'
         )
         
-        const ventasPorSemana = ventasVisitador.reduce((acc: VentaSemanal[], venta) => {
+        const ventasPorSemana = ventasVisitador.reduce((acc: VentaSemanal[], venta: VentaDB) => {
           const fecha = new Date(venta.fecha)
           const semana = getSemanaDelAño(fecha)
           const año = fecha.getFullYear()
@@ -94,13 +130,13 @@ export default function VentasMensualesPage() {
               total: venta.total,
               meta,
               porcentaje: (venta.total / meta) * 100,
-              clientes: venta.clientes
+              clientes: venta.clientes[0]
             })
           }
           return acc
         }, [])
         
-        const cobrosPorSemana = cobrosVisitador.reduce((acc: CobroSemanal[], cobro) => {
+        const cobrosPorSemana = cobrosVisitador.reduce((acc: CobroSemanal[], cobro: CobroDB) => {
           const fecha = new Date(cobro.fecha)
           const semana = getSemanaDelAño(fecha)
           const año = fecha.getFullYear()
@@ -117,11 +153,11 @@ export default function VentasMensualesPage() {
         return {
           id: visitador.id,
           nombre: visitador.nombre,
-          ventas: ventasPorSemana.sort((a, b) => {
+          ventas: ventasPorSemana.sort((a: VentaSemanal, b: VentaSemanal) => {
             if (a.año !== b.año) return b.año - a.año
             return b.semana - a.semana
           }),
-          cobros: cobrosPorSemana.sort((a, b) => {
+          cobros: cobrosPorSemana.sort((a: CobroSemanal, b: CobroSemanal) => {
             if (a.año !== b.año) return b.año - a.año
             return b.semana - a.semana
           })
@@ -183,7 +219,7 @@ export default function VentasMensualesPage() {
       <h1 className="text-2xl font-bold mb-6">
         {usuario?.rol === 'admin' ? 'Ventas Semanales por Visitador' : 'Mis Ventas Semanales'}
       </h1>
-      {visitadores.map(visitador => {
+      {visitadores.map((visitador: Visitador) => {
         const totales = calcularTotales(visitador)
         return (
           <div key={visitador.id} className="mb-8">
@@ -203,12 +239,12 @@ export default function VentasMensualesPage() {
                 <tbody>
                   {visitador.ventas.length > 0 || visitador.cobros.length > 0 ? (
                     [...new Set([
-                      ...visitador.ventas.map(v => `${v.año}-${v.semana}`),
-                      ...visitador.cobros.map(c => `${c.año}-${c.semana}`)
+                      ...visitador.ventas.map((v: VentaSemanal) => `${v.año}-${v.semana}`),
+                      ...visitador.cobros.map((c: CobroSemanal) => `${c.año}-${c.semana}`)
                     ])].sort().reverse().map(semanaKey => {
                       const [año, semana] = semanaKey.split('-').map(Number)
-                      const venta = visitador.ventas.find(v => v.semana === semana && v.año === año)
-                      const cobro = visitador.cobros.find(c => c.semana === semana && c.año === año)
+                      const venta = visitador.ventas.find((v: VentaSemanal) => v.semana === semana && v.año === año)
+                      const cobro = visitador.cobros.find((c: CobroSemanal) => c.semana === semana && c.año === año)
 
                       return (
                         <tr key={semanaKey} className="border-b hover:bg-gray-50">
