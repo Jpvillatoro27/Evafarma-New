@@ -522,6 +522,44 @@ export const ventasService = {
       }
       fechaOriginal.setDate(fechaOriginal.getDate() + 1)
       const fechaAjustada = fechaOriginal.toISOString().split('T')[0]
+
+      // Validación de duplicados: buscar ventas del mismo cliente, en un rango de 5 minutos y mismos productos
+      const ahora = new Date()
+      const cincoMinAntes = new Date(ahora.getTime() - 5 * 60 * 1000)
+      const cincoMinDespues = new Date(ahora.getTime() + 5 * 60 * 1000)
+
+      // Buscar ventas del mismo cliente y created_at en el rango de 5 minutos
+      const { data: ventasSimilares, error: errorBusqueda } = await supabase
+        .from('ventas_mensuales')
+        .select('id, created_at, cliente_id')
+        .eq('cliente_id', ventaData.cliente_id)
+        .gte('created_at', cincoMinAntes.toISOString())
+        .lte('created_at', cincoMinDespues.toISOString())
+
+      if (errorBusqueda) throw errorBusqueda
+
+      if (ventasSimilares && ventasSimilares.length > 0) {
+        for (const venta of ventasSimilares) {
+          const { data: productosVenta, error: errorProd } = await supabase
+            .from('productos_venta')
+            .select('nombre, cantidad, precio_unitario')
+            .eq('venta_id', venta.id)
+
+          if (errorProd) continue
+
+          const productosA = [...ventaData.productos].sort((a, b) => a.nombre.localeCompare(b.nombre))
+          const productosB = [...(productosVenta || [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
+          const iguales = productosA.length === productosB.length && productosA.every((p, i) =>
+            p.nombre === productosB[i].nombre &&
+            p.cantidad === productosB[i].cantidad &&
+            p.precio_unitario === productosB[i].precio_unitario
+          )
+          if (iguales) {
+            throw new Error('Ya existe una venta igual creada recientemente. No se creará otra vez. (Si es una venta nueva por favor espere 5 minutos e intente de nuevo)')
+          }
+        }
+      }
+
       // 1. Crear la venta
       const { data: venta, error: ventaError } = await supabase
         .from('ventas_mensuales')
