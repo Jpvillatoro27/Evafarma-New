@@ -869,11 +869,11 @@ export default function VentasPage() {
 
       // Cargar y agregar el logo usando la API nativa
       const logo = new window.Image()
-      logo.src = '/sin-titulo.png'
+      logo.src = '/Logo.png'
       
       await new Promise((resolve) => {
         logo.onload = () => {
-          doc.addImage(logo, 'PNG', 10, 10, 40, 20)
+          doc.addImage(logo, 'PNG', 10, 18, 20, 20)
           resolve(null)
         }
       })
@@ -881,23 +881,23 @@ export default function VentasPage() {
       // Configuración inicial
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(16)
-      doc.text('ENVIO', 105, 20, { align: 'center', baseline: 'middle' })
+      doc.text('ENVIO', 105, 32, { align: 'center', baseline: 'middle' })
       
       // Información del envío
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      let y = 40
+      let y = 45
       
       doc.setFont('helvetica', 'bold')
       doc.text('N° Envío:', 10, y, { baseline: 'middle' })
       doc.setFont('helvetica', 'normal')
-      doc.text(venta.codigo || '', 40, y, { baseline: 'middle' })
+      doc.text(venta.codigo || '', 50, y, { baseline: 'middle' })
       
       y += 7
       doc.setFont('helvetica', 'bold')
       doc.text('Fecha:', 10, y, { baseline: 'middle' })
       doc.setFont('helvetica', 'normal')
-      doc.text(format(new Date(venta.fecha), 'dd/MM/yyyy'), 40, y, { baseline: 'middle' })
+      doc.text(format(new Date(venta.fecha), 'dd/MM/yyyy'), 50, y, { baseline: 'middle' })
       
       y += 7
       doc.setFont('helvetica', 'bold')
@@ -909,7 +909,7 @@ export default function VentasPage() {
         const usuarioObj = usuarios.find(u => u.id === venta.visitador)
         return usuarioObj?.nombre || 'N/A'
       })()
-      doc.text(visitadorNombre, 40, y, { baseline: 'middle' })
+      doc.text(visitadorNombre, 50, y, { baseline: 'middle' })
 
       // Información del cliente
       y += 15
