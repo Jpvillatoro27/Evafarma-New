@@ -41,6 +41,7 @@ export default function ClientesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [visitadores, setVisitadores] = useState<any[]>([])
   const [filtroVisitador, setFiltroVisitador] = useState<string>('todos')
+  const [filtroDepartamento, setFiltroDepartamento] = useState<string>('todos')
   const { toast } = useToast()
   const { user } = useAuth()
   const [selectedClienteLocation, setSelectedClienteLocation] = useState<Cliente | null>(null)
@@ -139,9 +140,9 @@ export default function ClientesPage() {
   }, [])
 
   useEffect(() => {
-    // Aplicar filtros de búsqueda y visitador
+    // Aplicar filtros de búsqueda, visitador y departamento
     let filtered = [...clientes]
-    
+
     // Filtrar por término de búsqueda
     if (searchTerm.trim()) {
       const termino = searchTerm.toLowerCase()
@@ -156,14 +157,19 @@ export default function ClientesPage() {
         cliente.saldo_pendiente.toString().includes(termino)
       )
     }
-    
+
     // Filtrar por visitador
     if (filtroVisitador !== 'todos') {
       filtered = filtered.filter(cliente => cliente.visitador === filtroVisitador)
     }
-    
+
+    // Filtrar por departamento
+    if (filtroDepartamento !== 'todos') {
+      filtered = filtered.filter(cliente => cliente.Departamento === filtroDepartamento)
+    }
+
     setClientesFiltrados(filtered)
-  }, [searchTerm, clientes, filtroVisitador])
+  }, [searchTerm, clientes, filtroVisitador, filtroDepartamento])
 
   const loadClientes = async () => {
     try {
@@ -463,30 +469,49 @@ export default function ClientesPage() {
         </Dialog>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-2 flex-wrap mb-4 items-center">
         <Input
           placeholder="Buscar en clientes..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md"
+          className="max-w-xs text-xs py-1 px-2 h-8"
         />
-        
-        <Select
-          value={filtroVisitador}
-          onValueChange={setFiltroVisitador}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filtrar por visitador" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los visitadores</SelectItem>
-            {visitadores.map(visitador => (
-              <SelectItem key={visitador.id} value={visitador.id}>
-                {visitador.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col">
+          <Label className="text-xs mb-0.5">Filtrar por visitador</Label>
+          <Select
+            value={filtroVisitador}
+            onValueChange={setFiltroVisitador}
+          >
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Todos los visitadores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los visitadores</SelectItem>
+              {visitadores.map(visitador => (
+                <SelectItem key={visitador.id} value={visitador.id}>
+                  {visitador.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col">
+          <Label className="text-xs mb-0.5">Filtrar por departamento</Label>
+          <Select
+            value={filtroDepartamento}
+            onValueChange={setFiltroDepartamento}
+          >
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Todos los departamentos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los departamentos</SelectItem>
+              {departamentos.map(depto => (
+                <SelectItem key={depto.iso} value={depto.nombre}>{depto.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {clientesFiltrados.length === 0 ? (
@@ -497,72 +522,77 @@ export default function ClientesPage() {
         </div>
       ) : (
         <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 text-xs">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIT</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Propietario</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departamento</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendiente</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Código</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nombre</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Dirección</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Teléfono</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">NIT</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Propietario</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Departamento</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Visitador</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Saldo Pendiente</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {clientesFiltrados.map((cliente) => (
-                <tr key={cliente.id}>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.codigo}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.nombre}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.direccion}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.telefono}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.nit}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.propietario}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{cliente.Departamento}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">Q{cliente.saldo_pendiente.toFixed(2)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex space-x-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClick(cliente)}
-                        title="Editar cliente"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Editar cliente</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedClienteLocation(cliente)}
-                              title="Ver ubicación"
-                            >
-                              <MapPinIcon className="h-5 w-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Ver ubicación</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {clientesFiltrados.map((cliente) => {
+                const visitadorObj = visitadores.find(v => v.id === cliente.visitador)
+                return (
+                  <tr key={cliente.id}>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.codigo}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.nombre}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.direccion}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.telefono}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.nit}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.propietario}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.Departamento}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{visitadorObj ? visitadorObj.nombre : 'N/A'}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">Q{cliente.saldo_pendiente.toFixed(2)}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      <div className="flex space-x-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditClick(cliente)}
+                                title="Editar cliente"
+                              >
+                                <PencilIcon className="h-5 w-5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Editar cliente</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedClienteLocation(cliente)}
+                                title="Ver ubicación"
+                              >
+                                <MapPinIcon className="h-5 w-5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver ubicación</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
