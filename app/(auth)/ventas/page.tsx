@@ -104,6 +104,8 @@ export default function VentasPage() {
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<'pendiente' | 'enviado' | 'anulado'>('pendiente')
   const [isEstadoDialogOpen, setIsEstadoDialogOpen] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
 
   useEffect(() => {
     loadVentas()
@@ -119,6 +121,14 @@ export default function VentasPage() {
     // Aplicar filtro por estado
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(venta => venta.estado === filtroEstado)
+    }
+
+    // Aplicar filtro de rango de fechas
+    if (fechaInicio) {
+      filtrados = filtrados.filter(venta => new Date(venta.fecha) >= new Date(fechaInicio))
+    }
+    if (fechaFin) {
+      filtrados = filtrados.filter(venta => new Date(venta.fecha) <= new Date(fechaFin))
     }
 
     // Aplicar filtro de búsqueda
@@ -137,7 +147,7 @@ export default function VentasPage() {
     }
 
     setVentasFiltradas(filtrados)
-  }, [ventas, filtroEstado, searchTerm])
+  }, [ventas, filtroEstado, searchTerm, fechaInicio, fechaFin])
 
   const loadVentas = async () => {
     try {
@@ -1233,6 +1243,26 @@ export default function VentasPage() {
           className="max-w-md"
         />
         <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Fecha inicio:</span>
+          <input
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            className="text-sm w-40 rounded-md border border-gray-300 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 transition shadow-sm"
+            style={{ color: fechaInicio ? '#111' : '#888' }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Fecha fin:</span>
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={(e) => setFechaFin(e.target.value)}
+            className="text-sm w-40 rounded-md border border-gray-300 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 transition shadow-sm"
+            style={{ color: fechaFin ? '#111' : '#888' }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Filtrar por estado:</span>
           <select
             value={filtroEstado}
@@ -1246,6 +1276,16 @@ export default function VentasPage() {
             <option value="anulado">Anulado</option>
           </select>
         </div>
+      </div>
+      {/* Mensaje de rango de fechas */}
+      <div className="mb-2 text-gray-600 text-sm">
+        {fechaInicio && fechaFin
+          ? `Se muestran las ventas de ${fechaInicio.split('-').reverse().join('/')} a ${fechaFin.split('-').reverse().join('/')}`
+          : fechaInicio
+            ? `Se muestran las ventas desde el ${fechaInicio.split('-').reverse().join('/')}`
+            : fechaFin
+              ? `Se muestran las ventas hasta el ${fechaFin.split('-').reverse().join('/')}`
+              : 'Se muestran todas las ventas'}
       </div>
 
       <div className="overflow-x-auto text-sm">
