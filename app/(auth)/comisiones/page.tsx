@@ -264,7 +264,7 @@ export default function ComisionesPage() {
     const xFechaVenta = 40
     const xFechaCobro = xFechaVenta + 70
     const xCliente = xFechaCobro + 70
-    const xMonto = xCliente + 120
+    const xMonto = xCliente + 150 // Aumentado de 120 a 150
     const xEfectivo = xMonto + 60
     const xCheque = xEfectivo + 80
     const xBanco = xCheque + 140
@@ -291,18 +291,25 @@ export default function ComisionesPage() {
       const tieneEfectivo = com.monto > valorCheque
       let efectivo = 0
       if (tieneEfectivo) efectivo = com.monto - valorCheque
+      
+      // Calcular altura necesaria para el nombre del cliente
+      const nombreCliente = cobro?.clientes?.nombre || '-'
+      const lineasCliente = doc.splitTextToSize(nombreCliente, 140) // Ancho máximo de 140pt
+      const alturaCliente = lineasCliente.length * 12 // 12pt por línea
+      
       doc.text(fechaVenta, xFechaVenta, y)
       doc.text(fechaCobro, xFechaCobro, y)
-      doc.text(`${cobro?.clientes?.nombre || '-'}`, xCliente, y)
+      doc.text(lineasCliente, xCliente, y)
       doc.text(`Q${com.monto.toFixed(2)}`, xMonto, y)
       doc.text(tieneEfectivo ? `Q${efectivo.toFixed(2)}` : '-', xEfectivo, y)
       doc.text(tieneCheque ? `N°: ${numeroCheque}, Q${valorCheque.toFixed(2)}` : '-', xCheque, y)
       doc.text(tieneCheque ? bancoCheque : '-', xBanco, y)
       doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 60, y)
+      
       totalEfectivo += efectivo
       totalCheque += valorCheque
       cantidadCobros++
-      y += 14
+      y += Math.max(14, alturaCliente) // Usar la altura del cliente o mínimo 14pt
     })
     // Ajustar cuadro de totales para formato horizontal (sin total comisión)
     y += 30
@@ -376,7 +383,7 @@ export default function ComisionesPage() {
     const xFechaVenta = 40
     const xFechaCobro = xFechaVenta + 70
     const xCliente = xFechaCobro + 70
-    const xMonto = xCliente + 120
+    const xMonto = xCliente + 150 // Aumentado de 120 a 150 para dar más espacio al cliente
     const xPorcentaje = xMonto + 60
     const xComision = xPorcentaje + 50
     const xEfectivo = xComision + 70
@@ -407,9 +414,15 @@ export default function ComisionesPage() {
       const tieneEfectivo = com.monto > valorCheque
       let efectivo = 0
       if (tieneEfectivo) efectivo = com.monto - valorCheque
+      
+      // Calcular altura necesaria para el nombre del cliente
+      const nombreCliente = cobro?.clientes?.nombre || '-'
+      const lineasCliente = doc.splitTextToSize(nombreCliente, 140) // Ancho máximo de 140pt para el cliente
+      const alturaCliente = lineasCliente.length * 12 // 12pt por línea
+      
       doc.text(fechaVenta, xFechaVenta, y)
       doc.text(fechaCobro, xFechaCobro, y)
-      doc.text(`${cobro?.clientes?.nombre || '-'}`, xCliente, y)
+      doc.text(lineasCliente, xCliente, y) // Usar las líneas divididas del cliente
       doc.text(`Q${com.monto.toFixed(2)}`, xMonto, y)
       doc.text(`${(com.porcentaje * 100).toFixed(0)}%`, xPorcentaje, y)
       doc.text(`Q${(com.monto * com.porcentaje).toFixed(2)}`, xComision, y)
@@ -417,11 +430,12 @@ export default function ComisionesPage() {
       doc.text(tieneCheque ? `N°: ${numeroCheque}, Q${valorCheque.toFixed(2)}` : '-', xCheque, y)
       doc.text(tieneCheque ? bancoCheque : '-', xBanco, y)
       doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 60, y)
+      
       totalEfectivo += efectivo
       totalCheque += valorCheque
       totalComision += com.monto * com.porcentaje
       cantidadCobros++
-      y += 14
+      y += Math.max(14, alturaCliente) // Usar la altura del cliente o mínimo 14pt
     })
     // Ajustar cuadro de totales para formato horizontal (sin total comisión)
     y += 30
