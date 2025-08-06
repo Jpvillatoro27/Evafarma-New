@@ -925,22 +925,15 @@ export default function CobrosPage() {
                             <CheckCircleIcon className="h-5 w-5" />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleAnularCobro(cobro.id)}
-                          disabled={cobro.Estado === 'Anulado'}
-                          className={`${
-                            cobro.Estado === 'Anulado'
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-900'
-                          }`}
-                          title={
-                            cobro.Estado === 'Anulado'
-                              ? 'Cobro ya anulado'
-                              : 'Anular cobro'
-                          }
-                        >
-                          <XCircleIcon className="h-5 w-5" />
-                        </button>
+                        {cobro.Estado === 'Pendiente' && (
+                          <button
+                            onClick={() => handleAnularCobro(cobro.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Anular cobro"
+                          >
+                            <XCircleIcon className="h-5 w-5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
                           title="Imprimir ticket"
