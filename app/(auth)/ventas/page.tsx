@@ -136,6 +136,7 @@ export default function VentasPage() {
       const termino = searchTerm.toLowerCase()
       filtrados = filtrados.filter(venta => 
         venta.clientes.nombre.toLowerCase().includes(termino) ||
+        venta.clientes.codigo.toLowerCase().includes(termino) ||
         new Date(venta.fecha).toLocaleDateString().includes(termino) ||
         venta.total.toString().includes(termino) ||
         venta.productos?.some(producto => 
@@ -936,6 +937,12 @@ export default function VentasPage() {
       
       y += 7
       doc.setFont('helvetica', 'bold')
+      doc.text('Código:', 10, y, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(venta.clientes?.codigo || '', 40, y, { baseline: 'middle' })
+      
+      y += 7
+      doc.setFont('helvetica', 'bold')
       doc.text('Dirección:', 10, y, { baseline: 'middle' })
       doc.setFont('helvetica', 'normal')
       doc.text(venta.clientes?.direccion || '', 40, y, { baseline: 'middle' })
@@ -1294,6 +1301,7 @@ export default function VentasPage() {
             <tr className="bg-gray-100">
               <th className="px-3 py-1.5 text-left">Código</th>
               <th className="px-3 py-1.5 text-left">Cliente</th>
+              <th className="px-3 py-1.5 text-left">Código Cliente</th>
               <th className="px-3 py-1.5 text-left">Fecha</th>
               <th className="px-3 py-1.5 text-left">Visitador</th>
               <th className="px-3 py-1.5 text-right">Total</th>
@@ -1311,6 +1319,7 @@ export default function VentasPage() {
               <tr key={venta.id} className="border-b hover:bg-gray-50">
                 <td className="px-3 py-1.5">{venta.codigo}</td>
                 <td className="px-3 py-1.5">{venta.clientes.nombre}</td>
+                <td className="px-3 py-1.5">{venta.clientes.codigo}</td>
                 <td className="px-3 py-1.5">
                   {new Date(venta.fecha).toLocaleDateString()}
                 </td>
