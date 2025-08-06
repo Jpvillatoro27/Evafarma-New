@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { CheckCircleIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { CheckCircleIcon, PrinterIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { jsPDF } from 'jspdf'
 import { supabase } from '@/lib/supabase'
 
@@ -390,6 +390,46 @@ export default function CobrosPage() {
       toast({
         title: 'Error',
         description: 'No se pudo confirmar el cobro',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleAnularCobro = async (cobroId: string) => {
+    if (!window.confirm('¿Está seguro de anular este cobro? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      // Anular el cobro actualizando el estado en la base de datos
+      const { error } = await supabase
+        .from('cobros')
+        .update({ Estado: 'Anulado' })
+        .eq('id', cobroId)
+
+      if (error) throw error
+
+      // Actualizar el estado en la interfaz inmediatamente
+      setCobros(prevCobros => 
+        prevCobros.map(cobro => 
+          cobro.id === cobroId 
+            ? { ...cobro, Estado: 'Anulado' } 
+            : cobro
+        )
+      )
+      
+      toast({
+        title: 'Cobro anulado',
+        description: 'El cobro ha sido anulado correctamente',
+      })
+      
+      // Recargar los cobros para asegurar que todo esté sincronizado
+      loadCobros()
+    } catch (error) {
+      console.error('Error al anular cobro:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo anular el cobro',
         variant: 'destructive'
       })
     }
@@ -807,9 +847,7 @@ export default function CobrosPage() {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cheque</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comentarios</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                {user?.rol === 'admin' && (
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                )}
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -847,38 +885,70 @@ export default function CobrosPage() {
                         'No aplica'
                       )}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
-                      {cobro.otros || 'Sin comentarios'}
+                    <td className={`px-3 py-2 text-sm text-gray-900 ${
+                      cobro.otros && cobro.otros.trim() 
+                        ? 'max-w-xs break-words' 
+                        : 'whitespace-nowrap w-auto'
+                    }`}>
+                      {cobro.otros && cobro.otros.trim() ? cobro.otros : 'Sin comentarios'}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         cobro.Estado === 'Confirmado' 
                           ? 'bg-green-100 text-green-800' 
+                          : cobro.Estado === 'Anulado'
+                          ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {cobro.Estado === 'Confirmado' ? 'Confirmado' : 'Pendiente'}
+                        {cobro.Estado === 'Confirmado' ? 'Confirmado' : cobro.Estado === 'Anulado' ? 'Anulado' : 'Pendiente'}
                       </span>
                     </td>
-                    {user?.rol === 'admin' && (
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                        <button
-                          onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
-                          disabled={cobro.Estado === 'Confirmado'}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title={cobro.Estado === 'Confirmado' ? 'Cobro ya confirmado' : 'Confirmar cobro'}
-                        >
-                          <CheckCircleIcon className="h-5 w-5" />
-                        </button>
-                      </td>
-                    )}
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
-                        title="Imprimir ticket"
-                        className="text-gray-600 hover:text-indigo-600"
-                      >
-                        <PrinterIcon className="h-5 w-5" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {user?.rol === 'admin' && (
+                          <button
+                            onClick={() => handleConfirmarCobro(cobro.id, cobro.cliente_id, cobro.total)}
+                            disabled={cobro.Estado === 'Confirmado' || cobro.Estado === 'Anulado'}
+                            className={`${
+                              cobro.Estado === 'Confirmado' || cobro.Estado === 'Anulado'
+                                ? 'text-gray-400 cursor-not-allowed' 
+                                : 'text-indigo-600 hover:text-indigo-900'
+                            }`}
+                            title={
+                              cobro.Estado === 'Confirmado' 
+                                ? 'Cobro ya confirmado' 
+                                : cobro.Estado === 'Anulado'
+                                ? 'No se puede confirmar un cobro anulado'
+                                : 'Confirmar cobro'
+                            }
+                          >
+                            <CheckCircleIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleAnularCobro(cobro.id)}
+                          disabled={cobro.Estado === 'Anulado'}
+                          className={`${
+                            cobro.Estado === 'Anulado'
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-red-600 hover:text-red-900'
+                          }`}
+                          title={
+                            cobro.Estado === 'Anulado'
+                              ? 'Cobro ya anulado'
+                              : 'Anular cobro'
+                          }
+                        >
+                          <XCircleIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => generarTicketCobroPDFCompleto(cobro, visitadores, ventas)}
+                          title="Imprimir ticket"
+                          className="text-gray-600 hover:text-indigo-600"
+                        >
+                          <PrinterIcon className="h-5 w-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
