@@ -70,6 +70,8 @@ export default function CobrosPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [clientes, setClientes] = useState<any[]>([])
+  const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([])
+  const [searchCliente, setSearchCliente] = useState('')
   const [visitadores, setVisitadores] = useState<Visitador[]>([])
   const { toast } = useToast()
   const { user } = useAuth()
@@ -184,6 +186,7 @@ export default function CobrosPage() {
         : data.filter(cliente => cliente.visitador === usuario?.id)
       
       setClientes(clientesFiltrados)
+      setClientesFiltrados(clientesFiltrados)
     } catch (error) {
       console.error('Error al cargar clientes:', error)
     }
@@ -215,6 +218,19 @@ export default function CobrosPage() {
   }, [])
 
   useEffect(() => {
+    if (searchCliente.trim() === '') {
+      setClientesFiltrados(clientes)
+    } else {
+      const termino = searchCliente.toLowerCase()
+      const filtrados = clientes.filter(cliente => 
+        cliente.nombre.toLowerCase().includes(termino) ||
+        cliente.codigo.toLowerCase().includes(termino)
+      )
+      setClientesFiltrados(filtrados)
+    }
+  }, [searchCliente, clientes])
+
+  useEffect(() => {
     async function cargarVentas() {
       try {
         const data = await ventasService.getVentas()
@@ -234,6 +250,7 @@ export default function CobrosPage() {
       cliente_id: clienteId,
       cod_farmacia: cliente?.codigo || ''
     }))
+    setSearchCliente('') // Limpiar búsqueda al seleccionar
 
     // Cargar ventas pendientes del cliente
     try {
@@ -734,16 +751,71 @@ export default function CobrosPage() {
                 </div>
                 <div>
                   <Label htmlFor="cliente">Cliente *</Label>
-                  <Select onValueChange={handleClienteChange}>
+                  <Select 
+                    onValueChange={handleClienteChange}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setSearchCliente('') // Limpiar búsqueda cuando se cierre
+                      }
+                    }}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccione un cliente" />
+                      <SelectValue placeholder="Seleccione un cliente">
+                        {formData.cliente_id && (() => {
+                          const clienteSeleccionado = clientes.find(c => c.id === formData.cliente_id)
+                          return clienteSeleccionado ? (
+                            <div className="flex flex-col">
+                              <span className="font-medium">{clienteSeleccionado.nombre}</span>
+                              <span className="text-xs text-gray-500">Código: {clienteSeleccionado.codigo}</span>
+                            </div>
+                          ) : null
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
-                      {clientes.map((cliente) => (
+                    <SelectContent className="max-h-96">
+                      <div className="p-2">
+                        <div className="relative">
+                          <Input
+                            placeholder="Buscar cliente por nombre o código..."
+                            value={searchCliente}
+                            onChange={(e) => setSearchCliente(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mb-2 pr-8"
+                            autoComplete="off"
+                          />
+                          {searchCliente && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSearchCliente('')
+                              }}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              type="button"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {clientesFiltrados.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nombre} ({cliente.codigo})
+                          <div className="flex flex-col">
+                            <span className="font-medium">{cliente.nombre}</span>
+                            <span className="text-xs text-gray-500">Código: {cliente.codigo}</span>
+                          </div>
                         </SelectItem>
                       ))}
+                      {searchCliente.trim() !== '' && (
+                        <div className="px-2 py-2 text-sm text-gray-500 text-center border-t">
+                          {clientesFiltrados.length === 0 
+                            ? 'No se encontraron clientes' 
+                            : `${clientesFiltrados.length} cliente${clientesFiltrados.length !== 1 ? 's' : ''} encontrado${clientesFiltrados.length !== 1 ? 's' : ''}`
+                          }
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

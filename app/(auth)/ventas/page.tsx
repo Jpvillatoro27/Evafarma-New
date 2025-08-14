@@ -84,6 +84,8 @@ export default function VentasPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [clientes, setClientes] = useState<any[]>([])
+  const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([])
+  const [searchCliente, setSearchCliente] = useState('')
   const [productos, setProductos] = useState<Producto[]>([])
   const [visitadores, setVisitadores] = useState<{ id: string; nombre: string }[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -114,6 +116,19 @@ export default function VentasPage() {
     loadVisitadores()
     loadUsuarios()
   }, [])
+
+  useEffect(() => {
+    if (searchCliente.trim() === '') {
+      setClientesFiltrados(clientes)
+    } else {
+      const termino = searchCliente.toLowerCase()
+      const filtrados = clientes.filter(cliente => 
+        cliente.nombre.toLowerCase().includes(termino) ||
+        cliente.codigo.toLowerCase().includes(termino)
+      )
+      setClientesFiltrados(filtrados)
+    }
+  }, [searchCliente, clientes])
 
   useEffect(() => {
     let filtrados = ventas
@@ -190,6 +205,7 @@ export default function VentasPage() {
         : data.filter(cliente => cliente.visitador === usuario?.id)
       
       setClientes(clientesFiltrados)
+      setClientesFiltrados(clientesFiltrados)
     } catch (error) {
       console.error('Error al cargar clientes:', error)
       toast({
@@ -554,13 +570,13 @@ export default function VentasPage() {
   // Función para imprimir el ticket de la venta
   const handleImprimirVenta = async (venta: Venta) => {
     // Calcular la altura necesaria basada en el contenido
-    const alturaBase = 400; // Altura base para el contenido mínimo
+    const alturaBase = 450; // Altura base aumentada para incluir código del cliente
     const alturaPorProducto = 30; // Altura estimada por cada producto
     const alturaTotal = alturaBase + (venta.productos?.length || 0) * alturaPorProducto;
 
     const doc = new jsPDF({
       unit: 'pt',
-      format: [164, 500],
+      format: [164, 600], // Aumentado de 500 a 600 para más espacio
       orientation: 'portrait'
     })
     let y = 20
@@ -604,6 +620,8 @@ export default function VentasPage() {
       doc.setFont('helvetica', 'normal')
       y += 14
       doc.text(`Nombre: ${venta.clientes?.nombre || 'N/D'}`, 10, y)
+      y += 12
+      doc.text(`Código: ${venta.clientes?.codigo || 'N/D'}`, 10, y)
       y += 12
       const direccionLines = doc.splitTextToSize(`Dirección: ${venta.clientes?.direccion || '-'}`, 140)
       doc.text(direccionLines, 10, y)
@@ -660,7 +678,7 @@ export default function VentasPage() {
       y += notaLines.length * 12
       doc.text('Gracias por su compra', 82, y, { align: 'center' })
       doc.setFont('helvetica', 'normal')
-      y += 96 // 8 líneas de espacio (12pt por línea)
+      y += 120 // 10 líneas de espacio (12pt por línea) - aumentado para mejor presentación
       doc.save(`Venta_${venta.codigo}.pdf`)
     }
   }
@@ -1109,17 +1127,70 @@ export default function VentasPage() {
                     <Label htmlFor="cliente">Cliente</Label>
                     <Select 
                       value={formData.cliente_id} 
-                      onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
+                      onValueChange={(value) => {
+                        setFormData({ ...formData, cliente_id: value })
+                        setSearchCliente('') // Limpiar búsqueda al seleccionar
+                      }}
+                      onOpenChange={(open) => {
+                        if (!open) {
+                          setSearchCliente('') // Limpiar búsqueda cuando se cierre
+                        }
+                      }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar cliente" />
+                        <SelectValue placeholder="Seleccionar cliente">
+                          {formData.cliente_id && (() => {
+                            const clienteSeleccionado = clientes.find(c => c.id === formData.cliente_id)
+                            return clienteSeleccionado ? (
+                              <div className="flex flex-col">
+                                <span className="font-medium">{clienteSeleccionado.nombre}</span>
+                                <span className="text-xs text-gray-500">Código: {clienteSeleccionado.codigo}</span>
+                              </div>
+                            ) : null
+                          })()}
+                        </SelectValue>
                       </SelectTrigger>
-                      <SelectContent>
-                        {clientes.map((cliente) => (
+                      <SelectContent className="max-h-96">
+                        <div className="p-2">
+                          <div className="relative">
+                            <Input
+                              placeholder="Buscar cliente por nombre o código..."
+                              value={searchCliente}
+                              onChange={(e) => setSearchCliente(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mb-2 pr-8"
+                              autoComplete="off"
+                            />
+                            {searchCliente && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSearchCliente('')
+                                }}
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                type="button"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {clientesFiltrados.map((cliente) => (
                           <SelectItem key={cliente.id} value={cliente.id}>
-                            {cliente.nombre}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{cliente.nombre}</span>
+                              <span className="text-xs text-gray-500">Código: {cliente.codigo}</span>
+                            </div>
                           </SelectItem>
                         ))}
+                        {clientesFiltrados.length === 0 && searchCliente.trim() !== '' && (
+                          <div className="px-2 py-2 text-sm text-gray-500 text-center">
+                            No se encontraron clientes
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
