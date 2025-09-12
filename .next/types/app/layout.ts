@@ -1,4 +1,4 @@
-// File: C:\Users\josep\OneDrive\Desktop\Otros\evafarma-next\app\layout.tsx
+// File: C:\Users\josep\OneDrive\Desktop\Otros\Evafarma-New\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

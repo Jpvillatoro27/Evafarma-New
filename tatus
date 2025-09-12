@@ -1,0 +1,15 @@
+warning: in the working copy of 'app/(auth)/comisiones/page.tsx', LF will be replaced by CRLF the next time Git touches it
+.next/app-build-manifest.json
+.next/server/app-paths-manifest.json
+.next/server/edge-runtime-webpack.js
+.next/server/middleware.js
+.next/server/server-reference-manifest.js
+.next/server/server-reference-manifest.json
+.next/server/webpack-runtime.js
+.next/static/media/26a46d62cd723877-s.woff2
+.next/static/media/55c55f0601d81cf3-s.woff2
+.next/static/media/581909926a08bbc8-s.woff2
+.next/static/media/97e0cb1ae144a2a9-s.woff2
+.next/trace
+.next/types/app/layout.ts
+app/(auth)/comisiones/page.tsx

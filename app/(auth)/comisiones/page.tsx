@@ -339,7 +339,7 @@ export default function ComisionesPage() {
   }
 
   // Nueva función para PDF de comisiones mensuales con % y comisión
-  function generarPDFComisionesMensuales() {
+  async function generarPDFComisionesMensuales() {
     const visitador = visitadores.find(v => v.id === filtroVisitador)
     if (!visitador || !mesSeleccionadoComisiones || !anioSeleccionadoComisiones) return
     
@@ -362,6 +362,23 @@ export default function ComisionesPage() {
       return
     }
 
+    // Obtener fechas de venta faltantes
+    const fechasVentaTemp = { ...fechasVenta }
+    const idsFaltantes = comisionesVisitador
+      .filter(c => c.venta_id && (!c.ventas_mensuales || !c.ventas_mensuales.fecha) && !fechasVentaTemp[c.venta_id])
+      .map(c => c.venta_id)
+    const uniqueIds = Array.from(new Set(idsFaltantes))
+    
+    for (const id of uniqueIds) {
+      try {
+        const res = await fetch(`/api/ventas/todas/venta/${id}`)
+        if (res.ok) {
+          const data = await res.json()
+          fechasVentaTemp[id] = data.fecha
+        }
+      } catch {}
+    }
+
     // Calcular primer y último día del mes
     const primerDia = new Date(parseInt(anioSeleccionadoComisiones), parseInt(mesSeleccionadoComisiones) - 1, 1)
     const ultimoDia = new Date(parseInt(anioSeleccionadoComisiones), parseInt(mesSeleccionadoComisiones), 0)
@@ -379,16 +396,16 @@ export default function ComisionesPage() {
     doc.text(`Periodo: ${periodoFmt}`, 40, y)
     doc.text(`Visitador: ${visitador.nombre}`, 540, y)
     y += 20
-    // Encabezados de tabla (con % y Comisión)
+    // Encabezados de tabla (con % y Comisión) - reduciendo ancho de las últimas 3 columnas
     const xFechaVenta = 40
     const xFechaCobro = xFechaVenta + 70
     const xCliente = xFechaCobro + 70
-    const xMonto = xCliente + 150 // Aumentado de 120 a 150 para dar más espacio al cliente
+    const xMonto = xCliente + 150
     const xPorcentaje = xMonto + 60
     const xComision = xPorcentaje + 50
     const xEfectivo = xComision + 70
-    const xCheque = xEfectivo + 80
-    const xBanco = xCheque + 140
+    const xCheque = xEfectivo + 60  // Reducido de 80 a 60
+    const xBanco = xCheque + 100    // Reducido de 140 a 100
     doc.setFontSize(9)
     doc.text('Fecha Venta', xFechaVenta, y)
     doc.text('Fecha Cobro', xFechaCobro, y)
@@ -399,13 +416,16 @@ export default function ComisionesPage() {
     doc.text('Efectivo', xEfectivo, y)
     doc.text('Cheque', xCheque, y)
     doc.text('Banco', xBanco, y)
-    doc.text('Fecha Cheque', xBanco + 60, y)
+    doc.text('Fecha Cheque', xBanco + 50, y)  // Reducido de 60 a 50
     y += 14
     let totalEfectivo = 0, totalCheque = 0, totalComision = 0, cantidadCobros = 0
-    comisionesVisitador.forEach((com) => {
+    const alturaMaxima = 500 // Altura máxima antes de crear nueva página
+    let esPrimeraPagina = true
+    
+    comisionesVisitador.forEach((com, index) => {
       const venta = com.ventas_mensuales
       const cobro = com.cobros
-      const fechaVenta = venta && venta.fecha ? format(new Date(venta.fecha), 'dd/MM/yyyy') : (fechasVenta[com.venta_id] ? format(new Date(fechasVenta[com.venta_id]), 'dd/MM/yyyy') : '-')
+      const fechaVenta = venta && venta.fecha ? format(new Date(venta.fecha), 'dd/MM/yyyy') : (fechasVentaTemp[com.venta_id] ? format(new Date(fechasVentaTemp[com.venta_id]), 'dd/MM/yyyy') : '-')
       const fechaCobro = com.fecha_cobro ? format(new Date(com.fecha_cobro), 'dd/MM/yyyy') : '-'
       const valorCheque = cobro && cobro.valor_cheque ? cobro.valor_cheque : 0
       const numeroCheque = cobro && cobro.numero_cheque ? cobro.numero_cheque : '-'
@@ -419,6 +439,37 @@ export default function ComisionesPage() {
       const nombreCliente = cobro?.clientes?.nombre || '-'
       const lineasCliente = doc.splitTextToSize(nombreCliente, 140) // Ancho máximo de 140pt para el cliente
       const alturaCliente = lineasCliente.length * 12 // 12pt por línea
+      const alturaFila = Math.max(14, alturaCliente)
+      
+      // Verificar si necesitamos una nueva página
+      if (y + alturaFila > alturaMaxima) {
+        // Crear nueva página
+        doc.addPage()
+        y = 80
+        esPrimeraPagina = false
+        
+        // Reimprimir encabezados en la nueva página
+        doc.addImage('/sin-titulo.png', 'PNG', 40, 30, 90, 30)
+        doc.setFontSize(16)
+        doc.text('Control de Comisiones Mensual', 400, y, { align: 'center' })
+        y += 24
+        doc.setFontSize(10)
+        doc.text(`Periodo: ${periodoFmt}`, 40, y)
+        doc.text(`Visitador: ${visitador.nombre}`, 540, y)
+        y += 20
+        doc.setFontSize(9)
+        doc.text('Fecha Venta', xFechaVenta, y)
+        doc.text('Fecha Cobro', xFechaCobro, y)
+        doc.text('Cliente', xCliente, y)
+        doc.text('Monto', xMonto, y)
+        doc.text('Porcentaje', xPorcentaje, y)
+        doc.text('Comisión', xComision, y)
+        doc.text('Efectivo', xEfectivo, y)
+        doc.text('Cheque', xCheque, y)
+        doc.text('Banco', xBanco, y)
+        doc.text('Fecha Cheque', xBanco + 50, y)
+        y += 14
+      }
       
       doc.text(fechaVenta, xFechaVenta, y)
       doc.text(fechaCobro, xFechaCobro, y)
@@ -429,15 +480,15 @@ export default function ComisionesPage() {
       doc.text(tieneEfectivo ? `Q${efectivo.toFixed(2)}` : '-', xEfectivo, y)
       doc.text(tieneCheque ? `N°: ${numeroCheque}, Q${valorCheque.toFixed(2)}` : '-', xCheque, y)
       doc.text(tieneCheque ? bancoCheque : '-', xBanco, y)
-      doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 60, y)
+      doc.text(cobro && cobro.fecha_cheque ? format(new Date(cobro.fecha_cheque), 'dd/MM/yyyy') : '-', xBanco + 50, y)
       
       totalEfectivo += efectivo
       totalCheque += valorCheque
       totalComision += com.monto * com.porcentaje
       cantidadCobros++
-      y += Math.max(14, alturaCliente) // Usar la altura del cliente o mínimo 14pt
+      y += alturaFila
     })
-    // Ajustar cuadro de totales para formato horizontal (sin total comisión)
+    // Ajustar cuadro de totales finales
     y += 30
     doc.setFontSize(11)
     doc.setFillColor(220, 230, 241)
@@ -846,9 +897,9 @@ export default function ComisionesPage() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (mesSeleccionadoComisiones && anioSeleccionadoComisiones) {
-                    generarPDFComisionesMensuales()
+                    await generarPDFComisionesMensuales()
                     setMostrarDialogoComisiones(false)
                   } else {
                     toast({

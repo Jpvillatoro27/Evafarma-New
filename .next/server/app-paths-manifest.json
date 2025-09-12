@@ -1,9 +1,6 @@
 {
   "/api/comisiones/route": "app/api/comisiones/route.js",
+  "/api/ventas/todas/venta/[ventaId]/route": "app/api/ventas/todas/venta/[ventaId]/route.js",
   "/(auth)/page": "app/(auth)/page.js",
-  "/(auth)/ventas-mensuales/page": "app/(auth)/ventas-mensuales/page.js",
-  "/(auth)/cobros/page": "app/(auth)/cobros/page.js",
-  "/(auth)/comisiones/page": "app/(auth)/comisiones/page.js",
-  "/(auth)/ventas/page": "app/(auth)/ventas/page.js",
-  "/(auth)/usuarios/page": "app/(auth)/usuarios/page.js"
+  "/(auth)/comisiones/page": "app/(auth)/comisiones/page.js"
 }
