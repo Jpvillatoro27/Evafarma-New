@@ -1401,7 +1401,20 @@ export default function VentasPage() {
                   Q{venta.total.toFixed(2)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  Q{venta.saldo_venta?.toFixed(2) ?? '0.00'}
+                  {(() => {
+                    const saldoVenta = venta.saldo_venta ?? 0
+                    const fechaVenta = new Date(venta.fecha)
+                    const hoy = new Date()
+                    const diffTime = hoy.getTime() - fechaVenta.getTime()
+                    const diasTranscurridos = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+                    const esMoroso = saldoVenta > 0 && diasTranscurridos > 120
+                    
+                    return (
+                      <div className={`${esMoroso ? 'bg-red-500 text-white px-2 py-1 rounded' : ''}`} title={esMoroso ? 'El visitador debe pagar este saldo de la venta' : ''}>
+                        Q{saldoVenta.toFixed(2)}
+                      </div>
+                    )
+                  })()}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   Q{venta.clientes.saldo_pendiente.toFixed(2)}
