@@ -57,10 +57,41 @@ export const clientesService = {
     propietario?: string
     saldo_pendiente?: number
     Departamento: string
+    municipio?: string
     latitud?: number
     longitud?: number
   }) {
     try {
+      // Validación de duplicados: buscar clientes similares creados en un rango de 5 minutos
+      const ahora = new Date()
+      const cincoMinAntes = new Date(ahora.getTime() - 5 * 60 * 1000)
+      const cincoMinDespues = new Date(ahora.getTime() + 5 * 60 * 1000)
+
+      // Buscar clientes creados en el rango de 5 minutos
+      const { data: clientesSimilares, error: errorBusqueda } = await supabase
+        .from('clientes')
+        .select('id, created_at, nombre, codigo, nit, telefono, direccion')
+        .gte('created_at', cincoMinAntes.toISOString())
+        .lte('created_at', cincoMinDespues.toISOString())
+
+      if (errorBusqueda) throw errorBusqueda
+
+      if (clientesSimilares && clientesSimilares.length > 0) {
+        for (const clienteExistente of clientesSimilares) {
+          // Comparar campos clave para detectar duplicados
+          const mismoNombre = clienteExistente.nombre?.toLowerCase().trim() === cliente.nombre?.toLowerCase().trim()
+          const mismoCodigo = clienteExistente.codigo === cliente.codigo
+          const mismoNit = cliente.nit && clienteExistente.nit && clienteExistente.nit.toLowerCase().trim() === cliente.nit.toLowerCase().trim()
+          const mismoTelefono = cliente.telefono && clienteExistente.telefono && clienteExistente.telefono.toLowerCase().trim() === cliente.telefono.toLowerCase().trim()
+          const mismaDireccion = cliente.direccion && clienteExistente.direccion && clienteExistente.direccion.toLowerCase().trim() === cliente.direccion.toLowerCase().trim()
+
+          // Si hay coincidencias en campos clave, es probablemente un duplicado
+          if (mismoNombre && (mismoCodigo || mismoNit || mismoTelefono || mismaDireccion)) {
+            throw new Error('Ya existe un cliente similar creado recientemente. No se creará otra vez. (Si es un cliente nuevo por favor espere 5 minutos e intente de nuevo)')
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('clientes')
         .insert([cliente])
@@ -79,7 +110,7 @@ export const clientesService = {
     nombre?: string
     direccion?: string
     telefono?: string
-    email?: string
+    municipio?: string
     latitud?: number
     longitud?: number
     saldo_pendiente?: number
@@ -152,6 +183,40 @@ export const clientesService = {
       return data
     } catch (error) {
       console.error('Error al actualizar saldo:', error)
+      throw error
+    }
+  },
+
+  async getClientesPorVisitador(visitadorId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nombre, municipio, Departamento')
+        .eq('visitador', visitadorId)
+        .order('municipio', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al obtener clientes por visitador:', error)
+      throw error
+    }
+  },
+
+  async cambiarVisitadorPorMunicipio(municipio: string, visitadorId: string, nuevoVisitadorId: string) {
+    try {
+      // Actualizar todos los clientes del municipio que pertenecen al visitador actual
+      const { data, error } = await supabase
+        .from('clientes')
+        .update({ visitador: nuevoVisitadorId })
+        .eq('municipio', municipio)
+        .eq('visitador', visitadorId)
+        .select()
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al cambiar visitador por municipio:', error)
       throw error
     }
   }

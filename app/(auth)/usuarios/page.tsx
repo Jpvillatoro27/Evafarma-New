@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usuariosService } from '@/lib/services'
+import { usuariosService, clientesService } from '@/lib/services'
 import { useToast } from '@/components/ui/use-toast'
 import { MapPinIcon } from '@heroicons/react/24/outline'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Usuario {
   id: string
@@ -23,8 +24,13 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isGirasDialogOpen, setIsGirasDialogOpen] = useState(false)
+  const [isMunicipiosDialogOpen, setIsMunicipiosDialogOpen] = useState(false)
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null)
   const [giras, setGiras] = useState('')
+  const [municipios, setMunicipios] = useState<Array<{ municipio: string; cantidad: number }>>([])
+  const [municipioSeleccionado, setMunicipioSeleccionado] = useState<string | null>(null)
+  const [nuevoVisitadorId, setNuevoVisitadorId] = useState<string>('')
+  const [todosVisitadores, setTodosVisitadores] = useState<Usuario[]>([])
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -48,7 +54,98 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     loadUsuarios()
+    loadTodosVisitadores()
   }, [])
+
+  const loadTodosVisitadores = async () => {
+    try {
+      const data = await usuariosService.getVisitadores()
+      setTodosVisitadores(data)
+    } catch (error) {
+      console.error('Error al cargar visitadores:', error)
+    }
+  }
+
+  const handleOpenMunicipiosDialog = async (usuario: Usuario) => {
+    setSelectedUsuario(usuario)
+    try {
+      // Obtener todos los clientes del visitador
+      const clientes = await clientesService.getClientesPorVisitador(usuario.id)
+      
+      // Agrupar por municipio y contar
+      const municipiosMap = new Map<string, number>()
+      clientes.forEach(cliente => {
+        if (cliente.municipio) {
+          const count = municipiosMap.get(cliente.municipio) || 0
+          municipiosMap.set(cliente.municipio, count + 1)
+        }
+      })
+      
+      // Convertir a array y ordenar
+      const municipiosArray = Array.from(municipiosMap.entries())
+        .map(([municipio, cantidad]) => ({ municipio, cantidad }))
+        .sort((a, b) => a.municipio.localeCompare(b.municipio))
+      
+      setMunicipios(municipiosArray)
+      setIsMunicipiosDialogOpen(true)
+    } catch (error) {
+      console.error('Error al cargar municipios:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los municipios',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleCambiarVisitador = async (municipio: string) => {
+    if (!selectedUsuario || !nuevoVisitadorId) {
+      toast({
+        title: 'Error',
+        description: 'Por favor seleccione un visitador',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (nuevoVisitadorId === selectedUsuario.id) {
+      toast({
+        title: 'Error',
+        description: 'Debe seleccionar un visitador diferente',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (!window.confirm(`¿Está seguro de cambiar todos los clientes del municipio "${municipio}" del visitador "${selectedUsuario.nombre}" al nuevo visitador seleccionado?`)) {
+      return
+    }
+
+    try {
+      const clientesActualizados = await clientesService.cambiarVisitadorPorMunicipio(
+        municipio,
+        selectedUsuario.id,
+        nuevoVisitadorId
+      )
+
+      toast({
+        title: 'Éxito',
+        description: `Se cambiaron ${clientesActualizados.length} cliente(s) del municipio "${municipio}" al nuevo visitador`,
+      })
+
+      // Recargar los municipios para actualizar la lista
+      await handleOpenMunicipiosDialog(selectedUsuario)
+      setNuevoVisitadorId('')
+      setMunicipioSeleccionado(null)
+    } catch (error) {
+      console.error('Error al cambiar visitador:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo cambiar el visitador',
+        variant: 'destructive'
+      })
+    }
+  }
 
   const handleOpenGirasDialog = (usuario: Usuario) => {
     setSelectedUsuario(usuario)
@@ -193,14 +290,24 @@ export default function UsuariosPage() {
                       : 'Sin giras asignadas'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <button
-                      onClick={() => handleOpenGirasDialog(usuario)}
-                      className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1"
-                      title="Editar giras"
-                    >
-                      <MapPinIcon className="h-5 w-5" />
-                      <span>Agregar gira</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenMunicipiosDialog(usuario)}
+                        className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                        title="Ver giras (municipios)"
+                      >
+                        <MapPinIcon className="h-5 w-5" />
+                        <span>Giras</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenGirasDialog(usuario)}
+                        className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1"
+                        title="Editar giras"
+                      >
+                        <MapPinIcon className="h-5 w-5" />
+                        <span>Agregar gira</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -231,6 +338,86 @@ export default function UsuariosPage() {
               </Button>
               <Button onClick={handleSaveGiras}>
                 Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMunicipiosDialogOpen} onOpenChange={setIsMunicipiosDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Giras de {selectedUsuario?.nombre}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {municipios.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Este visitador no tiene clientes asignados</p>
+            ) : (
+              <div className="space-y-3">
+                {municipios.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.municipio}</p>
+                      <p className="text-sm text-gray-500">{item.cantidad} cliente(s)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {municipioSeleccionado === item.municipio ? (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={nuevoVisitadorId}
+                            onValueChange={setNuevoVisitadorId}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="Seleccionar visitador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {todosVisitadores
+                                .filter(v => v.id !== selectedUsuario?.id)
+                                .map((visitador) => (
+                                  <SelectItem key={visitador.id} value={visitador.id}>
+                                    {visitador.nombre}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={() => handleCambiarVisitador(item.municipio)}
+                            disabled={!nuevoVisitadorId}
+                            size="sm"
+                          >
+                            Confirmar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setMunicipioSeleccionado(null)
+                              setNuevoVisitadorId('')
+                            }}
+                            size="sm"
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setMunicipioSeleccionado(item.municipio)
+                            setNuevoVisitadorId('')
+                          }}
+                          size="sm"
+                        >
+                          Cambiar de visitador
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsMunicipiosDialogOpen(false)}>
+                Cerrar
               </Button>
             </div>
           </div>

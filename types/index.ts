@@ -8,6 +8,7 @@ export interface Cliente {
   visitador: string
   propietario: string
   saldo_pendiente: number
+  municipio?: string
 }
 
 export interface Cobro {

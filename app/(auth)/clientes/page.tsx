@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PencilIcon, MapPinIcon } from '@heroicons/react/24/outline'
 import { LocationPicker } from '@/components/LocationPicker'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getMunicipiosByDepartamento } from '@/lib/municipios'
 // import { LocationPicker } from '@/components/LocationPicker'
 // import { MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -28,6 +29,7 @@ interface Cliente {
   propietario?: string
   saldo_pendiente: number
   Departamento: string
+  municipio?: string
   latitud?: number
   longitud?: number
 }
@@ -54,6 +56,7 @@ export default function ClientesPage() {
     nit: '',
     propietario: '',
     Departamento: '',
+    municipio: '',
     latitud: 14.6349,
     longitud: -90.5069,
     saldo_pendiente: ''
@@ -69,9 +72,14 @@ export default function ClientesPage() {
     propietario: '',
     saldo_pendiente: '',
     Departamento: '',
+    municipio: '',
     latitud: 14.6349,
     longitud: -90.5069
   })
+
+  // Municipios disponibles según el departamento seleccionado
+  const municipiosDisponibles = formData.Departamento ? getMunicipiosByDepartamento(formData.Departamento) : []
+  const municipiosDisponiblesEdit = editFormData.Departamento ? getMunicipiosByDepartamento(editFormData.Departamento) : []
 
   // Lista de departamentos de Guatemala con sus códigos ISO
   const departamentos = [
@@ -154,6 +162,7 @@ export default function ClientesPage() {
         cliente.nit?.toLowerCase().includes(termino) ||
         cliente.propietario?.toLowerCase().includes(termino) ||
         cliente.Departamento?.toLowerCase().includes(termino) ||
+        cliente.municipio?.toLowerCase().includes(termino) ||
         cliente.saldo_pendiente.toString().includes(termino)
       )
     }
@@ -265,6 +274,7 @@ export default function ClientesPage() {
         propietario: '',
         saldo_pendiente: '',
         Departamento: '',
+        municipio: '',
         latitud: 14.6349,
         longitud: -90.5069
       })
@@ -292,6 +302,7 @@ export default function ClientesPage() {
       nit: cliente.nit || '',
       propietario: cliente.propietario || '',
       Departamento: cliente.Departamento,
+      municipio: cliente.municipio || '',
       latitud: cliente.latitud || 14.6349,
       longitud: cliente.longitud || -90.5069,
       saldo_pendiente: cliente.saldo_pendiente.toString()
@@ -358,7 +369,7 @@ export default function ClientesPage() {
                   <Label htmlFor="Departamento">Departamento *</Label>
                   <Select
                     value={formData.Departamento}
-                    onValueChange={(value) => setFormData({ ...formData, Departamento: value })}
+                    onValueChange={(value) => setFormData({ ...formData, Departamento: value, municipio: '' })}
                     required
                   >
                     <SelectTrigger>
@@ -368,6 +379,27 @@ export default function ClientesPage() {
                       {departamentos.map((depto) => (
                         <SelectItem key={depto.iso} value={depto.nombre}>
                           {depto.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="municipio">Municipio *</Label>
+                  <Select
+                    value={formData.municipio}
+                    onValueChange={(value) => setFormData({ ...formData, municipio: value })}
+                    required
+                    disabled={!formData.Departamento}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={formData.Departamento ? "Seleccionar municipio" : "Primero seleccione un departamento"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {municipiosDisponibles.map((municipio) => (
+                        <SelectItem key={municipio} value={municipio}>
+                          {municipio}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -532,6 +564,7 @@ export default function ClientesPage() {
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">NIT</th>
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Propietario</th>
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Departamento</th>
+                <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Municipio</th>
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Visitador</th>
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Saldo Pendiente</th>
                 <th className="px-2 py-1 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Acciones</th>
@@ -549,6 +582,7 @@ export default function ClientesPage() {
                     <td className="px-2 py-1 whitespace-nowrap">{cliente.nit}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{cliente.propietario}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{cliente.Departamento}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{cliente.municipio || '-'}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{visitadorObj ? visitadorObj.nombre : 'N/A'}</td>
                     <td className="px-2 py-1 whitespace-nowrap">Q{cliente.saldo_pendiente.toFixed(2)}</td>
                     <td className="px-2 py-1 whitespace-nowrap">
@@ -656,7 +690,7 @@ export default function ClientesPage() {
                 <Label htmlFor="edit-Departamento">Departamento *</Label>
                 <Select
                   value={editFormData.Departamento}
-                  onValueChange={(value) => setEditFormData({ ...editFormData, Departamento: value })}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, Departamento: value, municipio: '' })}
                   required
                 >
                   <SelectTrigger>
@@ -666,6 +700,27 @@ export default function ClientesPage() {
                     {departamentos.map((depto) => (
                       <SelectItem key={depto.iso} value={depto.nombre}>
                         {depto.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-municipio">Municipio *</Label>
+                <Select
+                  value={editFormData.municipio}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, municipio: value })}
+                  required
+                  disabled={!editFormData.Departamento}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={editFormData.Departamento ? "Seleccionar municipio" : "Primero seleccione un departamento"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {municipiosDisponiblesEdit.map((municipio) => (
+                      <SelectItem key={municipio} value={municipio}>
+                        {municipio}
                       </SelectItem>
                     ))}
                   </SelectContent>
