@@ -205,6 +205,17 @@ export const clientesService = {
 
   async cambiarVisitadorPorMunicipio(municipio: string, visitadorId: string, nuevoVisitadorId: string) {
     try {
+      // Primero obtener los IDs de los clientes que se van a cambiar
+      const { data: clientes, error: errorClientes } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('municipio', municipio)
+        .eq('visitador', visitadorId)
+
+      if (errorClientes) throw errorClientes
+
+      const clienteIds = clientes?.map(c => c.id) || []
+
       // Actualizar todos los clientes del municipio que pertenecen al visitador actual
       const { data, error } = await supabase
         .from('clientes')
@@ -214,6 +225,21 @@ export const clientesService = {
         .select()
 
       if (error) throw error
+
+      // Actualizar las ventas ligadas a esos clientes
+      if (clienteIds.length > 0) {
+        const { error: errorVentas } = await supabase
+          .from('ventas_mensuales')
+          .update({ visitador: nuevoVisitadorId })
+          .in('cliente_id', clienteIds)
+          .eq('visitador', visitadorId)
+
+        if (errorVentas) {
+          console.error('Error al actualizar ventas:', errorVentas)
+          throw errorVentas
+        }
+      }
+
       return data || []
     } catch (error) {
       console.error('Error al cambiar visitador por municipio:', error)
