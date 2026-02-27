@@ -308,23 +308,27 @@ export default function CobrosPage() {
     }
 
     try {
-      // Buscar el número de cobro más alto existente
-      const { data: cobrosTodos } = await supabase
+      // Buscar el número de cobro más alto existente de forma eficiente
+      const { data: ultimoCobro, error: errorUltimoCobro } = await supabase
         .from('cobros')
-        .select('numero');
+        .select('numero')
+        .order('numero', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-      let maxNum = 0;
-      if (Array.isArray(cobrosTodos)) {
-        cobrosTodos.forEach(c => {
-          if (c.numero && /^C\d{9}$/.test(c.numero)) {
-            const num = parseInt(c.numero.replace('C', ''), 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
-          }
-        });
+      if (errorUltimoCobro && errorUltimoCobro.code !== 'PGRST116') {
+        throw errorUltimoCobro
       }
-      const nuevoNumero = `C${(maxNum + 1).toString().padStart(9, '0')}`;
+
+      let maxNum = 0
+      if (ultimoCobro?.numero && /^C\d{9}$/.test(ultimoCobro.numero)) {
+        const num = parseInt(ultimoCobro.numero.replace('C', ''), 10)
+        if (!isNaN(num)) {
+          maxNum = num
+        }
+      }
+
+      const nuevoNumero = `C${(maxNum + 1).toString().padStart(9, '0')}`
 
       // Limpiar campos opcionales de cheque
       const cobroData = {
