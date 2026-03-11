@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { ventasService, usuariosService, cobrosService } from '@/lib/services'
+import { endOfISOWeek, format, getISOWeek, getISOWeekYear, setISOWeek, setISOWeekYear, startOfISOWeek } from 'date-fns'
 
 interface VentaSemanal {
   semana: number
@@ -81,6 +82,7 @@ export default function VentasMensualesPage() {
   const [error, setError] = useState<string | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [mesesSeleccionados, setMesesSeleccionados] = useState<string[]>([])
+  const [anioSeleccionado, setAnioSeleccionado] = useState<string>(new Date().getFullYear().toString())
   const [todasLasVentas, setTodasLasVentas] = useState<VentaDB[]>([])
   const [todosLosCobros, setTodosLosCobros] = useState<CobroDB[]>([])
   const [todosLosUsuarios, setTodosLosUsuarios] = useState<{ id: string; nombre: string }[]>([])
@@ -93,14 +95,15 @@ export default function VentasMensualesPage() {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`
   }
 
-  // Función para obtener la semana del año
-  const getSemanaDelAño = (fecha: Date) => {
-    const inicioAño = new Date(fecha.getFullYear(), 0, 1)
-    const diff = fecha.getTime() - inicioAño.getTime()
-    const unDia = 1000 * 60 * 60 * 24
-    const dia = Math.floor(diff / unDia)
-    return Math.ceil((dia + inicioAño.getDay() + 1) / 7)
-  }
+  const obtenerAnio = (fecha: string) => new Date(fecha).getFullYear().toString()
+
+  // Lista de años disponibles (ventas + cobros)
+  const aniosDisponibles = useMemo(() => {
+    const setAnios = new Set<string>()
+    todasLasVentas.forEach(v => setAnios.add(obtenerAnio(v.fecha)))
+    todosLosCobros.forEach(c => setAnios.add(obtenerAnio(c.fecha)))
+    return Array.from(setAnios).sort().reverse()
+  }, [todasLasVentas, todosLosCobros])
 
   // Generar lista de meses disponibles
   const mesesDisponibles = useMemo(() => {
@@ -112,14 +115,20 @@ export default function VentasMensualesPage() {
 
   // Filtrar ventas y cobros por meses seleccionados
   const ventasFiltradas = useMemo(() => {
-    if (mesesSeleccionados.length === 0) return todasLasVentas
-    return todasLasVentas.filter(v => mesesSeleccionados.includes(obtenerMesAnio(v.fecha)))
-  }, [todasLasVentas, mesesSeleccionados])
+    return todasLasVentas.filter(v => {
+      const cumpleAnio = anioSeleccionado === 'todos' || obtenerAnio(v.fecha) === anioSeleccionado
+      const cumpleMes = mesesSeleccionados.length === 0 || mesesSeleccionados.includes(obtenerMesAnio(v.fecha))
+      return cumpleAnio && cumpleMes
+    })
+  }, [todasLasVentas, mesesSeleccionados, anioSeleccionado])
 
   const cobrosFiltrados = useMemo(() => {
-    if (mesesSeleccionados.length === 0) return todosLosCobros
-    return todosLosCobros.filter(c => mesesSeleccionados.includes(obtenerMesAnio(c.fecha)))
-  }, [todosLosCobros, mesesSeleccionados])
+    return todosLosCobros.filter(c => {
+      const cumpleAnio = anioSeleccionado === 'todos' || obtenerAnio(c.fecha) === anioSeleccionado
+      const cumpleMes = mesesSeleccionados.length === 0 || mesesSeleccionados.includes(obtenerMesAnio(c.fecha))
+      return cumpleAnio && cumpleMes
+    })
+  }, [todosLosCobros, mesesSeleccionados, anioSeleccionado])
 
   // Calcular visitadores con datos filtrados
   const visitadores = useMemo(() => {
@@ -141,8 +150,8 @@ export default function VentasMensualesPage() {
       
       const ventasPorSemana = ventasVisitador.reduce((acc: VentaSemanal[], venta: VentaDB) => {
         const fecha = new Date(venta.fecha)
-        const semana = getSemanaDelAño(fecha)
-        const año = fecha.getFullYear()
+        const semana = getISOWeek(fecha)
+        const año = getISOWeekYear(fecha)
         const meta = 20000
         
         const ventaSemanal = acc.find(v => v.semana === semana && v.año === año)
@@ -164,8 +173,8 @@ export default function VentasMensualesPage() {
       
       const cobrosPorSemana = cobrosVisitador.reduce((acc: CobroSemanal[], cobro: CobroDB) => {
         const fecha = new Date(cobro.fecha)
-        const semana = getSemanaDelAño(fecha)
-        const año = fecha.getFullYear()
+        const semana = getISOWeek(fecha)
+        const año = getISOWeekYear(fecha)
         
         const cobroSemanal = acc.find(c => c.semana === semana && c.año === año)
         if (cobroSemanal) {
@@ -236,18 +245,13 @@ export default function VentasMensualesPage() {
   }, [])
 
   const getRangoFechasSemana = (semana: number, año: number) => {
-    const inicioAño = new Date(año, 0, 1)
-    const primerDiaSemana = new Date(inicioAño)
-    primerDiaSemana.setDate(inicioAño.getDate() + (semana - 1) * 7 - inicioAño.getDay() + 1)
-    
-    const ultimoDiaSemana = new Date(primerDiaSemana)
-    ultimoDiaSemana.setDate(primerDiaSemana.getDate() + 6)
-    
-    const formatearFecha = (fecha: Date) => {
-      return fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
-    }
-    
-    return `${formatearFecha(primerDiaSemana)} al ${formatearFecha(ultimoDiaSemana)}`
+    // ISO week: lunes -> domingo, consistente entre años
+    const base = setISOWeekYear(setISOWeek(new Date(año, 0, 4), semana), año)
+    const inicio = startOfISOWeek(base)
+    const fin = endOfISOWeek(base)
+    const fmt = (d: Date) => format(d, 'd MMMM', { locale: undefined as any })
+    // Evitamos cambiar locales aquí para no tocar más dependencias; usamos formato estable.
+    return `${fmt(inicio)} al ${fmt(fin)}`
   }
 
   // Utilidad para mostrar el mes en texto
@@ -280,6 +284,19 @@ export default function VentasMensualesPage() {
       {/* Filtro de meses */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4">
         <label className="font-semibold text-lg text-gray-700">Filtrar por meses:</label>
+        <div className="flex items-center gap-2">
+          <label className="font-semibold text-lg text-gray-700">Año:</label>
+          <select
+            value={anioSeleccionado}
+            onChange={(e) => setAnioSeleccionado(e.target.value)}
+            className="border rounded px-3 py-2 bg-white min-w-[120px] focus:ring-2 focus:ring-indigo-400 shadow-sm hover:shadow-md transition"
+          >
+            <option value="todos">Todos</option>
+            {aniosDisponibles.map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
@@ -344,7 +361,14 @@ export default function VentasMensualesPage() {
                     [...new Set([
                       ...visitador.ventas.map((v: VentaSemanal) => `${v.año}-${v.semana}`),
                       ...visitador.cobros.map((c: CobroSemanal) => `${c.año}-${c.semana}`)
-                    ])].sort().reverse().map(semanaKey => {
+                    ])]
+                      .sort((a, b) => {
+                        const [aAño, aSemana] = a.split('-').map(Number)
+                        const [bAño, bSemana] = b.split('-').map(Number)
+                        if (aAño !== bAño) return bAño - aAño
+                        return bSemana - aSemana
+                      })
+                      .map(semanaKey => {
                       const [año, semana] = semanaKey.split('-').map(Number)
                       const venta = visitador.ventas.find((v: VentaSemanal) => v.semana === semana && v.año === año)
                       const cobro = visitador.cobros.find((c: CobroSemanal) => c.semana === semana && c.año === año)
