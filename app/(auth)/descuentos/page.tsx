@@ -32,7 +32,12 @@ interface DescuentoRow {
     codigo: string
     nombre: string
     saldo_pendiente: number
-  }
+  } | Array<{
+    id: string
+    codigo: string
+    nombre: string
+    saldo_pendiente: number
+  }>
 }
 
 interface VentaPendiente {
@@ -99,7 +104,11 @@ export default function DescuentosPage() {
         descuentosService.getDescuentos()
       ])
       setClientes(clientesData)
-      setDescuentos(descuentosData)
+      const descuentosNormalizados = (descuentosData || []).map((item: any) => ({
+        ...item,
+        clientes: Array.isArray(item.clientes) ? item.clientes[0] : item.clientes
+      }))
+      setDescuentos(descuentosNormalizados)
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error al cargar descuentos'
       setError(mensaje)
