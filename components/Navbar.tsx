@@ -41,6 +41,7 @@ export default function Navbar() {
     { name: 'Cobros', href: '/cobros' },
     ...(isAdmin ? [
       { name: 'Comisiones', href: '/comisiones' },
+      { name: 'Descuentos', href: '/descuentos' },
       { name: 'Ventas Mensuales', href: '/ventas-mensuales' },
       { name: 'Productos', href: '/productos' },
       { name: 'Visitadores', href: '/usuarios' }

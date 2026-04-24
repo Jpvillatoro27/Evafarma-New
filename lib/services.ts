@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from './supabase'
-import { Cliente, Cobro, Abono, Recibo, VentaMensual, Usuario } from '@/types'
+import { Cliente, Cobro, Abono, Recibo, VentaMensual, Usuario, Descuento } from '@/types'
 
 // Servicios de Clientes
 export const clientesService = {
@@ -751,6 +751,92 @@ export const ventasService = {
       if (error) throw error
     } catch (error) {
       console.error('Error al eliminar venta:', error)
+      throw error
+    }
+  }
+}
+
+export const descuentosService = {
+  async getDescuentos() {
+    try {
+      const { data, error } = await supabase
+        .from('descuentos')
+        .select(`
+          id,
+          codigo_descuento,
+          cliente_id,
+          venta_id,
+          saldo_anterior,
+          descuento,
+          comentario,
+          nuevo_saldo,
+          created_at,
+          clientes:cliente_id (
+            id,
+            codigo,
+            nombre,
+            saldo_pendiente
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al obtener descuentos:', error)
+      throw error
+    }
+  },
+
+  async createDescuento(descuentoData: {
+    cliente_id: string
+    venta_id: string
+    descuento: number
+    comentario?: string
+  }) {
+    try {
+      const payload = {
+        cliente_id: descuentoData.cliente_id,
+        venta_id: descuentoData.venta_id,
+        descuento: descuentoData.descuento,
+        comentario: descuentoData.comentario || null
+      }
+
+      const { data, error } = await supabase
+        .from('descuentos')
+        .insert([payload])
+        .select(`
+          id,
+          codigo_descuento,
+          cliente_id,
+          saldo_anterior,
+          descuento,
+          comentario,
+          nuevo_saldo,
+          created_at
+        `)
+        .single()
+
+      if (error) throw error
+      return data as Descuento
+    } catch (error) {
+      console.error('Error al crear descuento:', error)
+      throw error
+    }
+  },
+
+  async getClientesConSaldo() {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, codigo, nombre, saldo_pendiente')
+        .gt('saldo_pendiente', 0)
+        .order('nombre', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error al obtener clientes con saldo:', error)
       throw error
     }
   }

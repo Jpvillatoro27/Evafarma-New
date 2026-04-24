@@ -129,3 +129,15 @@ export interface PedidoInterno {
   fecha_aprobacion: string | null
   fecha_completado: string | null
 } 
+
+export interface Descuento {
+  id: string
+  codigo_descuento: string
+  cliente_id: string
+  venta_id: string
+  saldo_anterior: number
+  descuento: number
+  comentario?: string
+  nuevo_saldo: number
+  created_at: string
+}

@@ -121,6 +121,16 @@ export default function HomePage() {
               </svg>
             ),
           },
+          {
+            title: 'Descuentos',
+            description: 'Aplica descuentos y ajusta saldo de clientes',
+            href: '/descuentos',
+            icon: (
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9a3 3 0 11-6 0 3 3 0 016 0zm-9 9a6 6 0 1112 0H6zm13-8h2m-1-1v2M7 16l10-8" />
+              </svg>
+            ),
+          },
         ]
       : []),
   ]
