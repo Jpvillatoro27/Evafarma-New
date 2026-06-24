@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ventasService, clientesService, usuariosService } from '@/lib/services'
 import { productosService } from '@/services/productosService'
 import { supabase } from '@/lib/supabase'
@@ -83,9 +83,9 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [clientes, setClientes] = useState<any[]>([])
-  const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([])
+  const [clientes, setClientes] = useState<Cliente[]>([])
   const [searchCliente, setSearchCliente] = useState('')
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
   const [visitadores, setVisitadores] = useState<{ id: string; nombre: string }[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -117,17 +117,13 @@ export default function VentasPage() {
     loadUsuarios()
   }, [])
 
-  useEffect(() => {
-    if (searchCliente.trim() === '') {
-      setClientesFiltrados(clientes)
-    } else {
-      const termino = searchCliente.toLowerCase()
-      const filtrados = clientes.filter(cliente => 
-        cliente.nombre.toLowerCase().includes(termino) ||
-        cliente.codigo.toLowerCase().includes(termino)
-      )
-      setClientesFiltrados(filtrados)
-    }
+  const clientesFiltrados = useMemo(() => {
+    const termino = searchCliente.trim().toLowerCase()
+    if (!termino) return []
+    return clientes.filter((cliente) =>
+      cliente.nombre.toLowerCase().includes(termino) ||
+      cliente.codigo.toLowerCase().includes(termino)
+    )
   }, [searchCliente, clientes])
 
   useEffect(() => {
@@ -200,12 +196,11 @@ export default function VentasPage() {
       const usuario = await usuariosService.getUsuarioActual()
       
       // Filtrar los clientes según el rol del usuario
-      const clientesFiltrados = usuario?.rol === 'admin'
+      const listaClientes = usuario?.rol === 'admin'
         ? data
         : data.filter(cliente => cliente.visitador === usuario?.id)
       
-      setClientes(clientesFiltrados)
-      setClientesFiltrados(clientesFiltrados)
+      setClientes(listaClientes)
     } catch (error) {
       console.error('Error al cargar clientes:', error)
       toast({
@@ -399,6 +394,8 @@ export default function VentasPage() {
         total: 0,
         comentario: ''
       })
+      setSearchCliente('')
+      setSelectedCliente(null)
       setIsDialogOpen(false)
       toast({
         title: 'Venta creada',
@@ -414,6 +411,12 @@ export default function VentasPage() {
         variant: 'destructive'
       })
     }
+  }
+
+  const handleSeleccionarCliente = (cliente: Cliente) => {
+    setFormData((prev) => ({ ...prev, cliente_id: cliente.id }))
+    setSelectedCliente(cliente)
+    setSearchCliente(`${cliente.codigo} - ${cliente.nombre}`)
   }
 
   const handleAgregarRastreo = async (venta: Venta) => {
@@ -1125,74 +1128,48 @@ export default function VentasPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cliente">Cliente</Label>
-                    <Select 
-                      value={formData.cliente_id} 
-                      onValueChange={(value) => {
-                        setFormData({ ...formData, cliente_id: value })
-                        setSearchCliente('') // Limpiar búsqueda al seleccionar
-                      }}
-                      onOpenChange={(open) => {
-                        if (!open) {
-                          setSearchCliente('') // Limpiar búsqueda cuando se cierre
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar cliente">
-                          {formData.cliente_id && (() => {
-                            const clienteSeleccionado = clientes.find(c => c.id === formData.cliente_id)
-                            return clienteSeleccionado ? (
-                              <div className="flex flex-col">
-                                <span className="font-medium">{clienteSeleccionado.nombre}</span>
-                                <span className="text-xs text-gray-500">Código: {clienteSeleccionado.codigo}</span>
-                              </div>
-                            ) : null
-                          })()}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="max-h-96">
-                        <div className="p-2">
-                          <div className="relative">
-                            <Input
-                              placeholder="Buscar cliente por nombre o código..."
-                              value={searchCliente}
-                              onChange={(e) => setSearchCliente(e.target.value)}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              onClick={(e) => e.stopPropagation()}
-                              className="mb-2 pr-8"
-                              autoComplete="off"
-                            />
-                            {searchCliente && (
+                    <div className="relative">
+                      <Input
+                        id="cliente"
+                        placeholder="Buscar cliente por nombre o código..."
+                        value={searchCliente}
+                        onChange={(e) => {
+                          setSearchCliente(e.target.value)
+                          setFormData((prev) => ({ ...prev, cliente_id: '' }))
+                          setSelectedCliente(null)
+                        }}
+                        autoComplete="off"
+                      />
+                      {searchCliente.trim() && !formData.cliente_id && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                          {clientesFiltrados.length > 0 ? (
+                            clientesFiltrados.map((cliente) => (
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSearchCliente('')
-                                }}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                key={cliente.id}
                                 type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleSeleccionarCliente(cliente)}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
                               >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <span className="font-medium">{cliente.codigo}</span> - {cliente.nombre}
+                                <span className="block text-xs text-gray-500">
+                                  Saldo pendiente: Q{Number(cliente.saldo_pendiente || 0).toFixed(2)}
+                                </span>
                               </button>
-                            )}
-                          </div>
-                        </div>
-                        {clientesFiltrados.map((cliente) => (
-                          <SelectItem key={cliente.id} value={cliente.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{cliente.nombre}</span>
-                              <span className="text-xs text-gray-500">Código: {cliente.codigo}</span>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-gray-500">
+                              No se encontraron clientes
                             </div>
-                          </SelectItem>
-                        ))}
-                        {clientesFiltrados.length === 0 && searchCliente.trim() !== '' && (
-                          <div className="px-2 py-2 text-sm text-gray-500 text-center">
-                            No se encontraron clientes
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {selectedCliente && (
+                      <p className="mt-2 text-sm text-indigo-700">
+                        Saldo pendiente del cliente: <span className="font-semibold">Q{Number(selectedCliente.saldo_pendiente || 0).toFixed(2)}</span>
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="fecha">Fecha</Label>
