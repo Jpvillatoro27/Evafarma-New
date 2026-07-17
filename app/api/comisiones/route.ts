@@ -20,25 +20,37 @@ export async function GET() {
       { cookies: { get: (name: string) => cookies().get(name)?.value } }
     )
 
-    // Solo seleccionar de la tabla comisiones
-    let { data: comisiones, error } = await supabase
-      .from('comisiones')
-      .select(`*, cobros:cobro_id (
-        id,
-        numero,
-        fecha,
-        visitador,
-        cliente_id,
-        banco,
-        numero_cheque,
-        fecha_cheque,
-        valor_cheque,
-        total,
-        clientes:cliente_id (nombre)
-      )`)
-      .order('created_at', { ascending: false })
+    // Traer todas las comisiones paginando, ya que PostgREST limita
+    // cada consulta a 1000 filas por defecto y este proyecto ya supera ese total
+    const PAGE_SIZE = 1000
+    let comisiones: any[] = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('comisiones')
+        .select(`*, cobros:cobro_id (
+          id,
+          numero,
+          fecha,
+          visitador,
+          cliente_id,
+          banco,
+          numero_cheque,
+          fecha_cheque,
+          valor_cheque,
+          total,
+          clientes:cliente_id (nombre)
+        )`)
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
 
-    if (error) throw error
+      if (error) throw error
+      if (!data || data.length === 0) break
+
+      comisiones = comisiones.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
 
     // Filtrar por visitador en backend si no es admin
     if (usuario.rol !== 'admin') {
