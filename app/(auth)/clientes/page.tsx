@@ -57,6 +57,7 @@ export default function ClientesPage() {
     propietario: '',
     Departamento: '',
     municipio: '',
+    visitador: '',
     latitud: 14.6349,
     longitud: -90.5069,
     saldo_pendiente: ''
@@ -303,6 +304,7 @@ export default function ClientesPage() {
       propietario: cliente.propietario || '',
       Departamento: cliente.Departamento,
       municipio: cliente.municipio || '',
+      visitador: cliente.visitador || '',
       latitud: cliente.latitud || 14.6349,
       longitud: cliente.longitud || -90.5069,
       saldo_pendiente: cliente.saldo_pendiente.toString()
@@ -321,6 +323,14 @@ export default function ClientesPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingCliente) return
+    if (!editFormData.visitador) {
+      toast({
+        title: 'Visitador requerido',
+        description: 'Seleccione un visitador de la lista',
+        variant: 'destructive'
+      })
+      return
+    }
 
     try {
       await clientesService.updateCliente(editingCliente.id, {
@@ -684,6 +694,26 @@ export default function ClientesPage() {
                   value={editFormData.propietario}
                   onChange={(e) => setEditFormData({ ...editFormData, propietario: e.target.value })}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-visitador">Visitador *</Label>
+                <Select
+                  value={editFormData.visitador || undefined}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, visitador: value })}
+                  required
+                >
+                  <SelectTrigger id="edit-visitador">
+                    <SelectValue placeholder="Seleccionar visitador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {visitadores.map((visitador) => (
+                      <SelectItem key={visitador.id} value={visitador.id}>
+                        {visitador.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

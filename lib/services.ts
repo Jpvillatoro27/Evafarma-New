@@ -117,6 +117,7 @@ export const clientesService = {
     propietario?: string
     nit?: string
     Departamento?: string
+    visitador?: string
   }) {
     try {
       console.log('Actualizando cliente:', { id, ...cliente })
