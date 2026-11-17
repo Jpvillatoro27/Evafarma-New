@@ -323,7 +323,8 @@ export default function ClientesPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingCliente) return
-    if (!editFormData.visitador) {
+    const esAdmin = user?.rol === 'admin'
+    if (esAdmin && !editFormData.visitador) {
       toast({
         title: 'Visitador requerido',
         description: 'Seleccione un visitador de la lista',
@@ -333,8 +334,10 @@ export default function ClientesPage() {
     }
 
     try {
+      const { visitador, ...datosCliente } = editFormData
       await clientesService.updateCliente(editingCliente.id, {
-        ...editFormData,
+        ...datosCliente,
+        ...(esAdmin ? { visitador } : {}),
         saldo_pendiente: editFormData.saldo_pendiente === '' ? 0 : parseFloat(editFormData.saldo_pendiente)
       })
       toast({
@@ -696,25 +699,27 @@ export default function ClientesPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-visitador">Visitador *</Label>
-                <Select
-                  value={editFormData.visitador || undefined}
-                  onValueChange={(value) => setEditFormData({ ...editFormData, visitador: value })}
-                  required
-                >
-                  <SelectTrigger id="edit-visitador">
-                    <SelectValue placeholder="Seleccionar visitador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {visitadores.map((visitador) => (
-                      <SelectItem key={visitador.id} value={visitador.id}>
-                        {visitador.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {user?.rol === 'admin' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-visitador">Visitador *</Label>
+                  <Select
+                    value={editFormData.visitador || undefined}
+                    onValueChange={(value) => setEditFormData({ ...editFormData, visitador: value })}
+                    required
+                  >
+                    <SelectTrigger id="edit-visitador">
+                      <SelectValue placeholder="Seleccionar visitador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {visitadores.map((visitador) => (
+                        <SelectItem key={visitador.id} value={visitador.id}>
+                          {visitador.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="edit-Departamento">Departamento *</Label>
